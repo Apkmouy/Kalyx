@@ -235,12 +235,12 @@ void KalyxRotaryControl::init(juce::Component& parent,
 
     slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 72, 15);
+    slider.setTextBoxIsEditable(true);
     slider.setColour(juce::Slider::rotarySliderFillColourId, initArcColour);
     slider.setColour(juce::Slider::thumbColourId,            capColour);
     slider.setColour(juce::Slider::textBoxTextColourId,       txtCol);
     slider.setColour(juce::Slider::textBoxBackgroundColourId, juce::Colours::transparentBlack);
     slider.setColour(juce::Slider::textBoxOutlineColourId,    juce::Colours::transparentBlack);
-    slider.setDoubleClickReturnValue(true, defaultResetValue);
     // Shift / Ctrl + glisser : mode réglage fin (0.1x)
     slider.setVelocityBasedMode(false);
     slider.setVelocityModeParameters(0.10, 1, 0.05, true,
@@ -259,9 +259,11 @@ void KalyxRotaryControl::init(juce::Component& parent,
     parent.addAndMakeVisible(titleLabel);
 
     // IMPORTANT : Détacher l'ancien attachment AVANT d'en créer un nouveau (évite toute écriture croisée lors d'un rebind),
-    // puis installer textFromValueFunction & valueFromTextFunction
+    // puis calibrer setDoubleClickReturnValue, textFromValueFunction & valueFromTextFunction APRÈS SliderAttachment
     attachment.reset();
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, paramID, slider);
+    slider.setTextBoxIsEditable(true);
+    slider.setDoubleClickReturnValue(true, defaultResetValue);
     if (valueFormatter)
     {
         slider.textFromValueFunction = std::move(valueFormatter);
