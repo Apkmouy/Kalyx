@@ -13,14 +13,14 @@ HarmonicSculptorUI::HarmonicSculptorUI(KalyxHybridConsoleProcessor& proc, int sl
     auto& apvts = processor_.getAPVTS();
     const auto defs = ModuleRegistry::getDefaultParamsForModule(SlotModuleId::HarmonicSculptor);
 
-    const auto aubergine = KalyxTheme::kalyxAubergine; // #5B2344
-    const auto royalBlue = KalyxTheme::kalyxRoyalBlue; // #2348B8
-    const auto gold      = KalyxTheme::amberLed;       // #E0A82E
+    const auto aubergine = KalyxTheme::kalyxAubergine;
+    const auto royalBlue = KalyxTheme::kalyxRoyalBlue;
+    const auto gold      = KalyxTheme::amberLed;
     const auto capCol    = KalyxTheme::nightControlIdleBg;
     constexpr bool darkTxt = false;
 
     setupKalyxToggle(*this, inBtn_, inAtt_, apvts, ParamIDs::slotParamId(slotIndex_, 1),
-                     "SCULPT IN", aubergine, darkTxt, "Engage or bypass Kalyx Harmonic Sculptor");
+                     "MATRIX IN", aubergine, darkTxt, "Engage or bypass Kalyx Harmonic Matrix");
     setupKalyxToggle(*this, tiltLinkBtn_, tiltLinkAtt_, apvts, ParamIDs::slotParamId(slotIndex_, 2),
                      "TILT LNK", royalBlue, darkTxt, "Compensate pre-saturation Tilt EQ inversely at output");
 
@@ -42,21 +42,25 @@ HarmonicSculptorUI::HarmonicSculptorUI(KalyxHybridConsoleProcessor& proc, int sl
         return KalyxValueParsers::formatDbClean(mapLin(static_cast<float>(v), -12.0f, 24.0f));
     };
 
+    evenOddPad_.init(*this, apvts,
+                     ParamIDs::slotParamId(slotIndex_, 3),
+                     ParamIDs::slotParamId(slotIndex_, 4),
+                     "EVEN", "ODD", defs[2], defs[3], false, gold, darkTxt,
+                     fmtPct, fmtPct,
+                     "2D Harmonic Matrix: EVEN 2nd (X) x ODD 3rd (Y) | Double-Click to Reset");
+
     for (auto& k : knobs_)
         k = std::make_unique<KalyxRotaryControl>();
 
-    knobs_[0]->init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 3), "EVEN (2nd)", gold, capCol, darkTxt, defs[2],
-                    fmtPct, "Asymmetric Tube / Class-A Even Harmonics (0-100%)", KalyxValueParsers::parseLinPct(0.0f, 100.0f));
-    knobs_[1]->init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 4), "ODD (3rd)", aubergine, capCol, darkTxt, defs[3],
-                    fmtPct, "Symmetric Tape / Transistor Odd Harmonics (0-100%)", KalyxValueParsers::parseLinPct(0.0f, 100.0f));
-    knobs_[2]->init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 5), "TILT EQ", royalBlue, capCol, darkTxt, defs[4],
+    knobs_[0]->init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 5), "TILT EQ", royalBlue, capCol, darkTxt, defs[4],
                     fmtTilt, "Pre-saturation Tilt EQ (-6 to +6 dB/oct)", KalyxValueParsers::parseLinDb(-6.0f, 6.0f));
-    knobs_[3]->init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 6), "DYNAMICS", royalBlue, capCol, darkTxt, defs[5],
+    knobs_[1]->init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 6), "DYNAMICS", royalBlue, capCol, darkTxt, defs[5],
                     fmtDyn, "Pre-clip Transient Punch (-50% to +50%)", KalyxValueParsers::parseLinPct(-50.0f, 50.0f));
-    knobs_[4]->init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 7), "DRIVE", aubergine, capCol, darkTxt, defs[6],
-                    fmtDrive, "Input Saturation Drive (-12 to +24 dB)", KalyxValueParsers::parseLinDb(-12.0f, 24.0f));
-    knobs_[5]->init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 8), "BLEND", royalBlue, capCol, darkTxt, defs[7],
-                    fmtPct, "Dry / Wet Parallel Saturation Mix (0-100%)", KalyxValueParsers::parseLinPct(0.0f, 100.0f));
+
+    driveBar_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 7), "DRIVE", aubergine, false, darkTxt, defs[6],
+                   fmtDrive, "Input Saturation Drive (-12 to +24 dB)", KalyxValueParsers::parseLinDb(-12.0f, 24.0f));
+    blendBar_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 8), "BLEND", royalBlue, false, darkTxt, defs[7],
+                   fmtPct, "Dry / Wet Parallel Saturation Mix (0-100%)", KalyxValueParsers::parseLinPct(0.0f, 100.0f));
 
     bandPill_ = std::make_unique<KalyxSegmentedPill>(
         apvts, ParamIDs::slotParamId(slotIndex_, 9), "",
@@ -76,8 +80,11 @@ HarmonicSculptorUI::HarmonicSculptorUI(KalyxHybridConsoleProcessor& proc, int sl
 void HarmonicSculptorUI::setUiScale(float s)
 {
     uiScale_ = std::clamp(s, 0.75f, 2.20f);
+    evenOddPad_.setUiScale(uiScale_);
     for (auto& k : knobs_)
         if (k) k->setUiScale(uiScale_);
+    driveBar_.setUiScale(uiScale_);
+    blendBar_.setUiScale(uiScale_);
     if (bandPill_)        bandPill_->setUiScale(uiScale_);
     if (routingSelector_) routingSelector_->setUiScale(uiScale_);
     resized();
@@ -89,16 +96,12 @@ void HarmonicSculptorUI::setChassisTheme(kalyx::core::ChassisTheme t)
     theme_ = t;
     const bool isDay = (t == kalyx::core::ChassisTheme::Day);
     const auto capCol = isDay ? KalyxTheme::dayControlIdleBg : KalyxTheme::nightControlIdleBg;
+    evenOddPad_.setThemeColours(KalyxTheme::amberLed, isDay);
+    driveBar_.setThemeColours(KalyxTheme::kalyxAubergine, isDay);
+    blendBar_.setThemeColours(KalyxTheme::kalyxRoyalBlue, isDay);
     if (routingSelector_) routingSelector_->setThemeColours(KalyxTheme::kalyxRoyalBlue, isDay);
-
-    const juce::Colour accents[6] = {
-        KalyxTheme::amberLed, KalyxTheme::kalyxAubergine,
-        KalyxTheme::kalyxRoyalBlue, KalyxTheme::kalyxRoyalBlue,
-        KalyxTheme::kalyxAubergine, KalyxTheme::kalyxRoyalBlue
-    };
-    for (int i = 0; i < 6; ++i)
-        if (knobs_[static_cast<std::size_t>(i)])
-            knobs_[static_cast<std::size_t>(i)]->setThemeColours(accents[i], capCol, isDay);
+    for (auto& k : knobs_)
+        if (k) k->setThemeColours(KalyxTheme::kalyxRoyalBlue, capCol, isDay);
     repaint();
 }
 
@@ -107,6 +110,9 @@ void HarmonicSculptorUI::updateDependentStates()
     const auto p = processor_.getSlotParamsForGUI(slotIndex_);
     const bool modOn = (p[0] > 0.5f);
     tiltLinkBtn_.setEnabled(modOn);
+    evenOddPad_.setDimmedDisabled(!modOn);
+    driveBar_.setDimmedDisabled(!modOn);
+    blendBar_.setDimmedDisabled(!modOn);
     if (bandPill_)        bandPill_->setEnabled(modOn);
     if (routingSelector_) routingSelector_->setEnabled(modOn);
     for (auto& k : knobs_)
@@ -172,7 +178,7 @@ void HarmonicSculptorUI::paint(juce::Graphics& g)
 
 void HarmonicSculptorUI::resized()
 {
-    const auto b = getLocalBounds().toFloat().reduced(4.0f * uiScale_, 2.0f * uiScale_);
+    const auto b = getLocalBounds().toFloat().reduced(5.0f * uiScale_, 3.0f * uiScale_);
     if (b.isEmpty()) return;
 
     const float hdrH = 22.0f * uiScale_;
@@ -182,37 +188,38 @@ void HarmonicSculptorUI::resized()
     tiltLinkBtn_.setBounds(static_cast<int>(b.getX() + halfW + 4.0f * uiScale_), static_cast<int>(b.getY()),
                            static_cast<int>(halfW), static_cast<int>(hdrH));
 
-    const float thdH = 18.0f * uiScale_;
+    const float thdH = 16.0f * uiScale_;
     thdBarRect_ = { b.getX(), b.getY() + hdrH + 3.0f * uiScale_, b.getWidth(), thdH };
 
     const float footH = 22.0f * uiScale_;
     const float routH = 22.0f * uiScale_;
-    const float footY = b.getBottom() - routH;
-    const float bandY = footY - footH - 4.0f * uiScale_;
+    const float faderH = 22.0f * uiScale_;
+    const float routY = b.getBottom() - routH;
+    const float bandY = routY - footH - 4.0f * uiScale_;
+    const float blendY = bandY - faderH - 4.0f * uiScale_;
+    const float driveY = blendY - faderH - 4.0f * uiScale_;
+
+    driveBar_.setBounds(static_cast<int>(b.getX()), static_cast<int>(driveY), static_cast<int>(b.getWidth()), static_cast<int>(faderH));
+    blendBar_.setBounds(static_cast<int>(b.getX()), static_cast<int>(blendY), static_cast<int>(b.getWidth()), static_cast<int>(faderH));
 
     if (bandPill_)
-        bandPill_->setBounds(static_cast<int>(b.getX()), static_cast<int>(bandY),
-                             static_cast<int>(b.getWidth()), static_cast<int>(footH));
+        bandPill_->setBounds(static_cast<int>(b.getX()), static_cast<int>(bandY), static_cast<int>(b.getWidth()), static_cast<int>(footH));
     if (routingSelector_)
-        routingSelector_->setBounds(static_cast<int>(b.getX()), static_cast<int>(footY),
-                                    static_cast<int>(b.getWidth()), static_cast<int>(routH));
+        routingSelector_->setBounds(static_cast<int>(b.getX()), static_cast<int>(routY), static_cast<int>(b.getWidth()), static_cast<int>(routH));
 
-    const float gridTop = thdBarRect_.getBottom() + 4.0f * uiScale_;
-    const float gridH   = std::max(40.0f, bandY - 4.0f * uiScale_ - gridTop);
-    const float rowH    = gridH / 3.0f;
+    const float topArea = thdBarRect_.getBottom() + 4.0f * uiScale_;
+    const float midH = std::max(60.0f, driveY - 4.0f * uiScale_ - topArea);
+    const float padH = std::clamp(midH * 0.56f, 68.0f * uiScale_, 135.0f * uiScale_);
+    evenOddPad_.setBounds(static_cast<int>(b.getX()), static_cast<int>(topArea), static_cast<int>(b.getWidth()), static_cast<int>(padH));
+
+    const float knobTop = topArea + padH + 4.0f * uiScale_;
+    const float knobH   = std::max(44.0f, (driveY - 4.0f * uiScale_) - knobTop);
     const float colW    = b.getWidth() * 0.5f;
-
-    for (int r = 0; r < 3; ++r)
+    for (int c = 0; c < 2; ++c)
     {
-        for (int c = 0; c < 2; ++c)
-        {
-            const int idx = r * 2 + c;
-            if (knobs_[static_cast<std::size_t>(idx)])
-                knobs_[static_cast<std::size_t>(idx)]->setBoundsTight(
-                    b.getX() + static_cast<float>(c) * colW,
-                    gridTop + static_cast<float>(r) * rowH,
-                    colW, rowH);
-        }
+        if (knobs_[static_cast<std::size_t>(c)])
+            knobs_[static_cast<std::size_t>(c)]->setBoundsTight(
+                b.getX() + static_cast<float>(c) * colW, knobTop, colW, knobH, 48.0f);
     }
 }
 

@@ -105,6 +105,7 @@ target_sources(KalyxHybridConsole
         Source/Consoles/KalyxModern/StereoPhaseDSP.cpp
         Source/Consoles/KalyxModern/StereoPhaseUI.cpp
         Source/UI/KalyxLookAndFeel.cpp
+        Source/UI/DataWidgets.cpp
         Source/UI/AnalogVUMeter.cpp
         Source/UI/ModuleSlotView.cpp
         Source/PluginProcessor.cpp

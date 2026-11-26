@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "PluginProcessor.h"
 #include "UI/KalyxLookAndFeel.h"
+#include "UI/DataWidgets.h"
 #include "UI/ModuleSlotView.h"
 #include "UI/AnalogVUMeter.h"
 #include <array>
@@ -60,9 +61,10 @@ private:
     // Tranche Fixe 1 : INPUT (adopte la finition historique du préampli actif)
     juce::ComboBox   inPreampBox_;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> inPreampAtt_;
-    KalyxRotaryControl inTrimCtrl_, inDriveCtrl_, inHpfFreqCtrl_, inLpfFreqCtrl_;
-    juce::ToggleButton inPhaseBtn_, inHpfBtn_, inLpfBtn_, inFiltToScBtn_, inExtScBtn_, inScListenBtn_;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> inPhaseAtt_, inHpfAtt_, inLpfAtt_, inFiltToScAtt_, inExtScAtt_, inScListenAtt_;
+    TactileFaderBar  inTrimBar_, inDriveBar_;
+    InputFilterGraph inFilterGraph_;
+    juce::ToggleButton inPhaseBtn_, inFiltToScBtn_, inExtScBtn_, inScListenBtn_;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> inPhaseAtt_, inFiltToScAtt_, inExtScAtt_, inScListenAtt_;
     juce::Rectangle<float> inputPanelRect_, inputLockRect_, inLedsRect_;
 
     // 5 Emplacements Série 500 Interchangeables (Slot A..E)
@@ -71,7 +73,8 @@ private:
     // Tranche Fixe 7 : MASTER (VU-mètre 300 ms + sélecteur segmenté [IN|OUT|GR] + Tol, Mix, Out Fader)
     AnalogVUMeter vuMeter_;
     std::unique_ptr<KalyxSegmentedPill> vuModePill_;
-    KalyxRotaryControl analogTolCtrl_, mixCtrl_, outFaderCtrl_;
+    TactileFaderBar analogTolBar_, mixBar_;
+    VerticalConsoleFader outFader_;
     juce::Rectangle<float> masterPanelRect_, masterLockRect_;
 
     kalyx::dsp::StudioMeterSnapshot meterSnap_ {};

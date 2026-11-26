@@ -100,30 +100,34 @@ UA1176UI::UA1176UI(KalyxHybridConsoleProcessor& proc, int slotIndex)
     auto parseDb24 = KalyxValueParsers::parseLinDb(-24.0f, 24.0f);
     auto parsePct  = KalyxValueParsers::parseLinPct(0.0f, 100.0f);
 
-    // 6 potentiomètres rotatifs
+    transferCurve_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 3),
+                        -24.0f, 24.0f, defs[2], false, accent, darkTxt,
+                        "Dynamic FET Transfer Curve (Drag to adjust Input/Threshold, Double-Click to Reset)");
+
+    // 4 potentiomètres principaux + 2 barres TactileFaderBar
     inputKnob_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 3),
                     "INPUT", accent, kKnobBody, darkTxt, defs[2], fmtDb,
-                    "1176 Input Drive (-24 to +24 dB): drives fixed FET threshold & harmonic saturation", parseDb24);
+                    "FET-76 Input Drive (-24 to +24 dB)", parseDb24);
 
     outputKnob_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 4),
                      "OUTPUT", accent, kKnobBody, darkTxt, defs[3], fmtDb,
-                     "1176 Output Makeup Stage (-24 to +24 dB)", parseDb24);
+                     "FET-76 Output Makeup Stage (-24 to +24 dB)", parseDb24);
 
     attackKnob_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 5),
                      "ATTACK", accent, kKnobBody, darkTxt, defs[4], fmtAttack,
-                     "FET Attack Time (Clockwise = Faster: 800 us -> 20 us, or 10 ms -> 20 us in SLOW mode)", parseAttack);
+                     "FET Attack Time (800 us -> 20 us, or 10 ms -> 20 us in SLOW mode)", parseAttack);
 
     releaseKnob_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 6),
                       "RELEASE", accent, kKnobBody, darkTxt, defs[5], fmtRelease,
-                      "FET Release Time (Clockwise = Faster: 1.1 s -> 50 ms)", parseRelease);
+                      "FET Release Time (1.1 s -> 50 ms)", parseRelease);
 
-    fetBiasKnob_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 7),
-                      "FET BIAS", accent, kKnobBody, darkTxt, defs[6], fmtPct,
-                      "FET Gate Bias / Headroom (Left = Clean Headroom, Right = Hot / Saturated)", parsePct);
+    fetBiasBar_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 7),
+                     "FET BIAS", accent, false, darkTxt, defs[6], fmtPct,
+                     "FET Gate Bias / Headroom (0 - 100 %)", parsePct);
 
-    blendKnob_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 8),
-                    "BLEND", accent, kKnobBody, darkTxt, defs[7], fmtPct,
-                    "Parallel Dry/Wet Compression Blend (0 - 100 %)", parsePct);
+    blendBar_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 8),
+                   "BLEND", accent, false, darkTxt, defs[7], fmtPct,
+                   "Parallel Dry/Wet Compression Blend (0 - 100 %)", parsePct);
 
     // MODS : [ ALL (SLAM) ] [SLOW]
     setupKalyxToggle(*this, slamBtn_, slamAtt_, apvts, ParamIDs::slotParamId(slotIndex_, 10),
@@ -154,12 +158,13 @@ juce::Colour UA1176UI::getCurrentAccentColour() const noexcept
 void UA1176UI::setUiScale(float s)
 {
     uiScale_ = std::clamp(s, 0.75f, 2.20f);
+    transferCurve_.setUiScale(uiScale_);
     inputKnob_.setUiScale(uiScale_);
     outputKnob_.setUiScale(uiScale_);
     attackKnob_.setUiScale(uiScale_);
     releaseKnob_.setUiScale(uiScale_);
-    fetBiasKnob_.setUiScale(uiScale_);
-    blendKnob_.setUiScale(uiScale_);
+    fetBiasBar_.setUiScale(uiScale_);
+    blendBar_.setUiScale(uiScale_);
     if (revSelector_)     revSelector_->setUiScale(uiScale_);
     if (routingSelector_) routingSelector_->setUiScale(uiScale_);
     resized();
@@ -182,12 +187,13 @@ void UA1176UI::applyRevisionTheme(int revIdx)
     const auto txtCol  = KalyxTheme::getTextPrimary(theme_);
     const auto capCol  = KalyxTheme::getControlIdleBg(theme_);
 
+    transferCurve_.setThemeColours(accent, darkTxt);
     inputKnob_.setThemeColours(accent, capCol, darkTxt);
     outputKnob_.setThemeColours(accent, capCol, darkTxt);
     attackKnob_.setThemeColours(accent, capCol, darkTxt);
     releaseKnob_.setThemeColours(accent, capCol, darkTxt);
-    fetBiasKnob_.setThemeColours(accent, capCol, darkTxt);
-    blendKnob_.setThemeColours(accent, capCol, darkTxt);
+    fetBiasBar_.setThemeColours(accent, darkTxt);
+    blendBar_.setThemeColours(accent, darkTxt);
 
     inBtn_.getProperties().set("kalyxDarkText", darkTxt);
     slamBtn_.getProperties().set("kalyxDarkText", darkTxt);
@@ -249,24 +255,27 @@ void UA1176UI::syncFromAPVTS()
         setKnobAlpha(outputKnob_);
         setKnobAlpha(attackKnob_);
         setKnobAlpha(releaseKnob_);
-        setKnobAlpha(fetBiasKnob_);
-        setKnobAlpha(blendKnob_);
+        fetBiasBar_.setDimmedDisabled(!modOn);
+        blendBar_.setDimmedDisabled(!modOn);
         slamBtn_.setAlpha(alpha);
         slowBtn_.setAlpha(alpha);
         if (routingSelector_) routingSelector_->setAlpha(alpha);
         needRepaint = true;
     }
 
+    static constexpr float kRatios[4] = { 4.0f, 8.0f, 12.0f, 20.0f };
+    transferCurve_.setCurveConfig(
+        allButtonsOn_ ? InteractiveTransferCurve::CurveType::FETSlam : InteractiveTransferCurve::CurveType::FET,
+        kRatios[std::clamp(currentRatio_, 0, 3)], 3.0f, moduleIn_, false);
+
     if (needRepaint)
         repaint();
 }
 
-void UA1176UI::setGainReductionDb(float grDb) noexcept
+void UA1176UI::setGainReductionDb(float grDb, float inputPeakDb) noexcept
 {
-    const float prev = smoothedGrDb_;
     smoothedGrDb_ = std::max(0.0f, grDb);
-    if (!grStripRect_.isEmpty() && std::abs(smoothedGrDb_ - prev) > 0.05f)
-        repaint(grStripRect_.expanded(2.0f).toNearestInt());
+    transferCurve_.setTelemetry(inputPeakDb, smoothedGrDb_);
 }
 
 void UA1176UI::drawGrLedStrip(juce::Graphics& g, juce::Rectangle<float> bounds) const
@@ -385,13 +394,10 @@ void UA1176UI::paint(juce::Graphics& g)
     if (!sepBotRect_.isEmpty())
         g.fillRect(sepBotRect_);
 
-    // 3. Barre GR 6-LEDs
-    drawGrLedStrip(g, grStripRect_);
-
-    // 4. Touches mécaniques RATIO : [4:1] [8:1] [12] [20]
+    // 3. Touches mécaniques RATIO : [4:1] [8:1] [12] [20]
     drawRatioButtons(g);
 
-    // 5. Libellé MODS :
+    // 4. Libellé MODS :
     g.setColour(KalyxTheme::getTextPrimary(theme_).withMultipliedAlpha(moduleIn_ ? 0.88f : 0.35f));
     g.setFont(juce::Font(juce::FontOptions(10.0f * uiScale_, juce::Font::bold)));
     g.drawFittedText("MODS :", modsLabelRect_.toNearestInt(), juce::Justification::centredLeft, 1);
@@ -414,27 +420,27 @@ void UA1176UI::resized()
                                 static_cast<int>(revW), static_cast<int>(topH));
     y += topH + 4.0f * uiScale_;
 
-    // Ligne 2 : GR: (●)-1 (●)-2 (○)-4 -6 -10 -20
-    const float grH = 26.0f * uiScale_;
-    grStripRect_ = { pad, y, innerW, grH };
-    y += grH + 4.0f * uiScale_;
+    // Ligne 2 : Courbe de transfert dynamique interactive
+    const float curveH = 82.0f * uiScale_;
+    transferCurve_.setBounds(static_cast<int>(pad), static_cast<int>(y), static_cast<int>(innerW), static_cast<int>(curveH));
+    y += curveH + 4.0f * uiScale_;
 
     // Séparateur haut
     sepTopRect_ = { pad, y, innerW, std::max(1.0f, 1.0f * uiScale_) };
     y += 4.0f * uiScale_;
 
-    // Zone basse réservée : séparateur + RATIO + MODS + ROUTING
+    // Zone basse réservée : 2 TactileFaderBar + séparateur + RATIO + MODS + ROUTING
+    const float faderH   = 21.0f * uiScale_;
     const float rowCtrlH = 22.0f * uiScale_;
     const float bottomH  = 3.0f * rowCtrlH + 18.0f * uiScale_;
-    const float knobZoneH = std::max(140.0f * uiScale_, b.getHeight() - y - bottomH - 4.0f * uiScale_);
+    const float fadersH  = 2.0f * faderH + 6.0f * uiScale_;
+    const float knobZoneH = std::max(100.0f * uiScale_, b.getHeight() - y - bottomH - fadersH - 6.0f * uiScale_);
 
     const float colW  = innerW * 0.5f;
-    const float row1H = knobZoneH * 0.40f;
-    const float row2H = knobZoneH * 0.30f;
-    const float row3H = knobZoneH - row1H - row2H;
+    const float row1H = knobZoneH * 0.55f;
+    const float row2H = knobZoneH - row1H;
 
-    // Hiérarchie de diamètre préservée (INPUT/OUTPUT plus grands)
-    const float bigMaxD   = 74.0f;
+    const float bigMaxD   = 62.0f;
     const float smallMaxD = 48.0f;
 
     inputOutputZone_ = { pad, y, innerW, row1H };
@@ -444,10 +450,11 @@ void UA1176UI::resized()
 
     attackKnob_.setBoundsTight (pad,        y, colW, row2H, smallMaxD);
     releaseKnob_.setBoundsTight(pad + colW, y, colW, row2H, smallMaxD);
-    y += row2H;
+    y += row2H + 2.0f * uiScale_;
 
-    fetBiasKnob_.setBoundsTight(pad,        y, colW, row3H, smallMaxD);
-    blendKnob_.setBoundsTight  (pad + colW, y, colW, row3H, smallMaxD);
+    fetBiasBar_.setBounds(static_cast<int>(pad), static_cast<int>(y), static_cast<int>(innerW), static_cast<int>(faderH));
+    y += faderH + 3.0f * uiScale_;
+    blendBar_.setBounds(static_cast<int>(pad), static_cast<int>(y), static_cast<int>(innerW), static_cast<int>(faderH));
 
     // Zone basse ancrée au bas du slot
     float botY = b.getHeight() - bottomH;

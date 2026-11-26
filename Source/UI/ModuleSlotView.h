@@ -5,6 +5,7 @@
 #include "../Core/ConsoleRegistry.h"
 #include "../PluginProcessor.h"
 #include "KalyxLookAndFeel.h"
+#include "DataWidgets.h"
 #include "../Consoles/UA1176/UA1176UI.h"
 #include "../Consoles/LA2A/LA2AUI.h"
 #include "../Consoles/Distressor/DistressorUI.h"
@@ -86,6 +87,7 @@ private:
     std::vector<std::unique_ptr<juce::ToggleButton>> toggles_;
     std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>> toggleAtts_;
     std::unique_ptr<KalyxEQCurveComponent> eqCurve_;
+    std::unique_ptr<InteractiveTransferCurve> transferCurve_;
     std::unique_ptr<kalyx::consoles::UA1176UI> ua1176UI_;
     std::unique_ptr<kalyx::consoles::LA2AUI> la2aUI_;
     std::unique_ptr<kalyx::consoles::DistressorUI> distressorUI_;

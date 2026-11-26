@@ -49,27 +49,31 @@ LA2AUI::LA2AUI(KalyxHybridConsoleProcessor& proc, int slotIndex)
     auto parseDb24 = KalyxValueParsers::parseLinDb(-24.0f, 24.0f);
     auto parsePct  = KalyxValueParsers::parseLinPct(0.0f, 100.0f);
 
+    transferCurve_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 4),
+                        -42.0f, -2.0f, defs[3], true, steel, darkTxt,
+                        "Dynamic Optical T4B Transfer Curve (Drag to adjust Peak Reduction, Double-Click to Reset)");
+
     // 2 gros potentiomètres principaux : GAIN et PEAK REDUCTION
     gainKnob_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 3),
                    "GAIN", steel, capCol, darkTxt, defs[2], fmtDb,
-                   "LA-2A Tube Output Gain (-24 to +24 dB, 12AX7 / 12BH7 + HA-100X)", parseDb24);
+                   "Opto-2A Tube Output Gain (-24 to +24 dB)", parseDb24);
 
     peakRedKnob_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 4),
                       "PEAK REDUCTION", steel, capCol, darkTxt, defs[3], fmtPct,
-                      "T4B Electroluminescent Panel Drive (0 - 100 %): controls optical gain reduction", parsePct);
+                      "T4B Electroluminescent Panel Drive (0 - 100 %)", parsePct);
 
-    // 3 petits potentiomètres secondaires : R37 EMPHASIS, CELL AGE, BLEND
-    r37EmphKnob_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 5),
-                      "R37 EMPHASIS", steel, capCol, darkTxt, defs[4], fmtPct,
-                      "R37 HF Sidechain Emphasis (0 % Flat -> 100 % Sibilance/HF Sensitive)", parsePct);
+    // 3 barres TactileFaderBar : R37 EMPHASIS, CELL AGE, BLEND
+    r37EmphBar_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 5),
+                     "R37 EMPHASIS", steel, false, darkTxt, defs[4], fmtPct,
+                     "R37 HF Sidechain Emphasis (0 % Flat -> 100 % HF Sensitive)", parsePct);
 
-    cellAgeKnob_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 6),
-                      "CELL AGE", steel, capCol, darkTxt, defs[5], fmtPct,
-                      "T4B Optical Cell Age (0 % New/T4A Fast -> 100 % Vintage/Long Memory Tail)", parsePct);
+    cellAgeBar_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 6),
+                     "CELL AGE", steel, false, darkTxt, defs[5], fmtPct,
+                     "T4B Optical Cell Age (0 % Fast -> 100 % Vintage Memory Tail)", parsePct);
 
-    blendKnob_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 7),
-                    "BLEND", steel, capCol, darkTxt, defs[6], fmtPct,
-                    "Parallel Dry/Wet Compression Blend (0 - 100 %)", parsePct);
+    blendBar_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 7),
+                   "BLEND", steel, false, darkTxt, defs[6], fmtPct,
+                   "Parallel Dry/Wet Compression Blend (0 - 100 %)", parsePct);
 
     // ROUTING : < STEREO >
     routingSelector_ = std::make_unique<KalyxArrowSelector>(
@@ -83,11 +87,12 @@ void LA2AUI::setUiScale(float s)
 {
     uiScale_ = std::clamp(s, 0.75f, 2.20f);
     inBtn_.getProperties().set("kalyxScale", uiScale_);
+    transferCurve_.setUiScale(uiScale_);
     gainKnob_.setUiScale(uiScale_);
     peakRedKnob_.setUiScale(uiScale_);
-    r37EmphKnob_.setUiScale(uiScale_);
-    cellAgeKnob_.setUiScale(uiScale_);
-    blendKnob_.setUiScale(uiScale_);
+    r37EmphBar_.setUiScale(uiScale_);
+    cellAgeBar_.setUiScale(uiScale_);
+    blendBar_.setUiScale(uiScale_);
     if (routingSelector_) routingSelector_->setUiScale(uiScale_);
     resized();
     repaint();
@@ -104,11 +109,12 @@ void LA2AUI::setChassisTheme(kalyx::core::ChassisTheme t)
     const auto capCol  = KalyxTheme::getControlIdleBg(theme_);
 
     inBtn_.getProperties().set("kalyxDarkText", darkTxt);
+    transferCurve_.setThemeColours(steel, darkTxt);
     gainKnob_.setThemeColours(steel, capCol, darkTxt);
     peakRedKnob_.setThemeColours(steel, capCol, darkTxt);
-    r37EmphKnob_.setThemeColours(steel, capCol, darkTxt);
-    cellAgeKnob_.setThemeColours(steel, capCol, darkTxt);
-    blendKnob_.setThemeColours(steel, capCol, darkTxt);
+    r37EmphBar_.setThemeColours(steel, darkTxt);
+    cellAgeBar_.setThemeColours(steel, darkTxt);
+    blendBar_.setThemeColours(steel, darkTxt);
     if (routingSelector_) routingSelector_->setThemeColours(steel, darkTxt);
 
     repaint();
@@ -139,23 +145,24 @@ void LA2AUI::syncFromAPVTS()
         };
         setKnobAlpha(gainKnob_);
         setKnobAlpha(peakRedKnob_);
-        setKnobAlpha(r37EmphKnob_);
-        setKnobAlpha(cellAgeKnob_);
-        setKnobAlpha(blendKnob_);
+        r37EmphBar_.setDimmedDisabled(!modOn);
+        cellAgeBar_.setDimmedDisabled(!modOn);
+        blendBar_.setDimmedDisabled(!modOn);
         if (routingSelector_) routingSelector_->setAlpha(alpha);
         needRepaint = true;
     }
+
+    transferCurve_.setCurveConfig(InteractiveTransferCurve::CurveType::Opto,
+                                  isLimitMode_ ? 10.0f : 3.2f, 12.0f, moduleIn_, false);
 
     if (needRepaint)
         repaint();
 }
 
-void LA2AUI::setGainReductionDb(float grDb) noexcept
+void LA2AUI::setGainReductionDb(float grDb, float inputPeakDb) noexcept
 {
-    const float prev = smoothedGrDb_;
     smoothedGrDb_ = std::max(0.0f, grDb);
-    if (!grStripRect_.isEmpty() && std::abs(smoothedGrDb_ - prev) > 0.05f)
-        repaint(grStripRect_.expanded(2.0f).toNearestInt());
+    transferCurve_.setTelemetry(inputPeakDb, smoothedGrDb_);
 }
 
 void LA2AUI::drawPilotJewelLamp(juce::Graphics& g) const
@@ -285,7 +292,6 @@ void LA2AUI::paint(juce::Graphics& g)
 
     drawPilotJewelLamp(g);
     drawLimitCompSwitch(g);
-    drawGrLedStrip(g, grStripRect_);
 }
 
 void LA2AUI::resized()
@@ -295,7 +301,7 @@ void LA2AUI::resized()
     const float innerW = std::max(40.0f, b.getWidth() - 2.0f * pad);
     float y            = 4.0f * uiScale_;
 
-    // Ligne 1 : [● LA-2A IN] (●)   [ LIMIT | COMP ]
+    // Ligne 1 : [● OPTO-2A IN] (●)   [ LIMIT | COMP ]
     const float topH    = 22.0f * uiScale_;
     const float pilotW  = 14.0f * uiScale_;
     const float inW     = std::max(54.0f * uiScale_, innerW * 0.42f);
@@ -309,38 +315,30 @@ void LA2AUI::resized()
     compSwitchRect_     = limitCompFrameRect_.withTrimmedLeft(swW * 0.5f);
     y += topH + 4.0f * uiScale_;
 
-    // Ligne 2 : GR: (●)-1 (●)-2 (○)-4 -6 -10 -20
-    const float grH = 26.0f * uiScale_;
-    grStripRect_ = { pad, y, innerW, grH };
-    y += grH + 4.0f * uiScale_;
+    // Ligne 2 : Courbe de transfert dynamique optique
+    const float curveH = 86.0f * uiScale_;
+    transferCurve_.setBounds(static_cast<int>(pad), static_cast<int>(y), static_cast<int>(innerW), static_cast<int>(curveH));
+    y += curveH + 4.0f * uiScale_;
 
     // Séparateur haut
     sepTopRect_ = { pad, y, innerW, std::max(1.0f, 1.0f * uiScale_) };
     y += 4.0f * uiScale_;
 
-    // Zone basse : séparateur + ROUTING
+    // Zone basse : 3 TactileFaderBar + séparateur + ROUTING
+    const float faderH    = 22.0f * uiScale_;
+    const float fadersH   = 3.0f * faderH + 10.0f * uiScale_;
     const float rowCtrlH  = 22.0f * uiScale_;
     const float bottomH   = rowCtrlH + 10.0f * uiScale_;
-    const float knobZoneH = std::max(150.0f * uiScale_, b.getHeight() - y - bottomH - 4.0f * uiScale_);
+    const float knobZoneH = std::max(80.0f * uiScale_, b.getHeight() - y - bottomH - fadersH - 6.0f * uiScale_);
 
-    const float colW  = innerW * 0.5f;
-    const float row1H = knobZoneH * 0.42f;
-    const float row2H = knobZoneH * 0.29f;
-    const float row3H = knobZoneH - row1H - row2H;
+    const float colW = innerW * 0.5f;
+    gainKnob_.setBoundsTight   (pad,        y, colW, knobZoneH, 68.0f);
+    peakRedKnob_.setBoundsTight(pad + colW, y, colW, knobZoneH, 68.0f);
+    y += knobZoneH + 4.0f * uiScale_;
 
-    // Hiérarchie de diamètre préservée (GAIN / PEAK REDUCTION plus grands)
-    const float bigMaxD   = 74.0f;
-    const float smallMaxD = 46.0f;
-
-    gainKnob_.setBoundsTight   (pad,        y, colW, row1H, bigMaxD);
-    peakRedKnob_.setBoundsTight(pad + colW, y, colW, row1H, bigMaxD);
-    y += row1H;
-
-    r37EmphKnob_.setBoundsTight(pad,        y, colW, row2H, smallMaxD);
-    cellAgeKnob_.setBoundsTight(pad + colW, y, colW, row2H, smallMaxD);
-    y += row2H;
-
-    blendKnob_.setBoundsTight(pad + colW * 0.5f, y, colW, row3H, smallMaxD);
+    r37EmphBar_.setBounds(static_cast<int>(pad), static_cast<int>(y), static_cast<int>(innerW), static_cast<int>(faderH)); y += faderH + 3.0f * uiScale_;
+    cellAgeBar_.setBounds(static_cast<int>(pad), static_cast<int>(y), static_cast<int>(innerW), static_cast<int>(faderH)); y += faderH + 3.0f * uiScale_;
+    blendBar_.setBounds  (static_cast<int>(pad), static_cast<int>(y), static_cast<int>(innerW), static_cast<int>(faderH));
 
     // Zone basse ancrée au bas du slot
     float botY = b.getHeight() - bottomH;

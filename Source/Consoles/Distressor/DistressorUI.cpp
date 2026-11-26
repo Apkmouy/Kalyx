@@ -82,14 +82,19 @@ DistressorUI::DistressorUI(KalyxHybridConsoleProcessor& proc, int slotIndex)
     releaseKnob_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 5),
                       "RELEASE", amber, capCol, darkTxt, defs[4], fmtRelease,
                       "Release Time (50 ms to 3.5 s)", parseRel);
-    blendKnob_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 12),
-                    "BLEND", sigRed, capCol, darkTxt, defs[11], fmtPct,
-                    "Parallel Dry/Wet Compression Blend (0 - 100 %)", parsePct);
+
+    transferCurve_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 2),
+                        -24.0f, 24.0f, defs[1], false, sigRed, darkTxt,
+                        "Dynamic Stress-VCA Transfer Curve (Drag to adjust Input Drive, Double-Click to Reset)");
+
+    blendBar_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 12),
+                   "BLEND", sigRed, false, darkTxt, defs[11], fmtPct,
+                   "Parallel Dry/Wet Compression Blend (0 - 100 %)", parsePct);
 
     ratioSelector_ = std::make_unique<KalyxArrowSelector>(
         apvts, ParamIDs::slotParamId(slotIndex_, 6), "RATIO",
         juce::StringArray { "1:1", "2:1", "3:1", "4:1", "6:1", "10:1", "20:1", "NUKE" },
-        sigRed, darkTxt, "Select Distressor Ratio Curve (1:1 harmonic warmer to NUKE brickwall)");
+        sigRed, darkTxt, "Select Ratio Curve (1:1 harmonic warmer to NUKE brickwall)");
     addAndMakeVisible(*ratioSelector_);
 
     distPill_ = std::make_unique<KalyxSegmentedPill>(
@@ -123,11 +128,12 @@ void DistressorUI::setUiScale(float s)
     uiScale_ = std::clamp(s, 0.75f, 2.20f);
     inBtn_.getProperties().set("kalyxScale", uiScale_);
     britishBtn_.getProperties().set("kalyxScale", uiScale_);
+    transferCurve_.setUiScale(uiScale_);
     inputKnob_.setUiScale(uiScale_);
     outputKnob_.setUiScale(uiScale_);
     attackKnob_.setUiScale(uiScale_);
     releaseKnob_.setUiScale(uiScale_);
-    blendKnob_.setUiScale(uiScale_);
+    blendBar_.setUiScale(uiScale_);
     if (ratioSelector_)   ratioSelector_->setUiScale(uiScale_);
     if (distPill_)        distPill_->setUiScale(uiScale_);
     if (filterPill_)      filterPill_->setUiScale(uiScale_);
@@ -150,11 +156,12 @@ void DistressorUI::setChassisTheme(kalyx::core::ChassisTheme t)
     inBtn_.getProperties().set("kalyxDarkText", darkTxt);
     britishBtn_.getProperties().set("kalyxDarkText", darkTxt);
 
+    transferCurve_.setThemeColours(sigRed, darkTxt);
     inputKnob_.setThemeColours(sigRed, capCol, darkTxt);
     outputKnob_.setThemeColours(amber, capCol, darkTxt);
     attackKnob_.setThemeColours(amber, capCol, darkTxt);
     releaseKnob_.setThemeColours(amber, capCol, darkTxt);
-    blendKnob_.setThemeColours(sigRed, capCol, darkTxt);
+    blendBar_.setThemeColours(sigRed, darkTxt);
 
     if (ratioSelector_)   ratioSelector_->setThemeColours(sigRed, darkTxt);
     if (distPill_)        distPill_->setThemeColours(amber, darkTxt);
@@ -209,7 +216,7 @@ void DistressorUI::syncFromAPVTS()
         setKnobAlpha(outputKnob_);
         setKnobAlpha(attackKnob_);
         setKnobAlpha(releaseKnob_);
-        setKnobAlpha(blendKnob_);
+        blendBar_.setDimmedDisabled(!modOn);
         britishBtn_.setAlpha(alpha);
         nukeBtn_.setAlpha(alpha);
         if (ratioSelector_)   ratioSelector_->setAlpha(alpha);
@@ -219,19 +226,22 @@ void DistressorUI::syncFromAPVTS()
         needRepaint = true;
     }
 
+    static constexpr float kRatios[8] = { 1.0f, 2.0f, 3.0f, 4.0f, 6.0f, 10.0f, 20.0f, 100.0f };
+    transferCurve_.setCurveConfig(
+        britishOn_ ? InteractiveTransferCurve::CurveType::DistressorBrit : InteractiveTransferCurve::CurveType::Distressor,
+        kRatios[std::clamp(ratioIdx_, 0, 7)], 4.0f, moduleIn_, false);
+
     if (needRepaint)
         repaint();
 }
 
-void DistressorUI::setTelemetry(float grDb, float thdPct) noexcept
+void DistressorUI::setTelemetry(float grDb, float thdPct, float inputPeakDb) noexcept
 {
-    const float prevGr  = smoothedGrDb_;
     const float prevThd = smoothedThd_;
     smoothedGrDb_ = std::max(0.0f, grDb);
     smoothedThd_  = std::max(0.0f, thdPct);
 
-    if (!grStripRect_.isEmpty() && std::abs(smoothedGrDb_ - prevGr) > 0.05f)
-        repaint(grStripRect_.expanded(2.0f).toNearestInt());
+    transferCurve_.setTelemetry(inputPeakDb, smoothedGrDb_);
     if (!thdStripRect_.isEmpty() && std::abs(smoothedThd_ - prevThd) > 0.05f)
         repaint(thdStripRect_.expanded(2.0f).toNearestInt());
 }
@@ -341,7 +351,6 @@ void DistressorUI::paint(juce::Graphics& g)
     if (!sepTopRect_.isEmpty()) g.fillRect(sepTopRect_);
     if (!sepBotRect_.isEmpty()) g.fillRect(sepBotRect_);
 
-    drawGrBargraph(g, grStripRect_);
     drawThdLeds(g, thdStripRect_);
 }
 
@@ -352,7 +361,7 @@ void DistressorUI::resized()
     const float iw  = b.getWidth() - 2.0f * pad;
     float y = 4.0f * uiScale_;
 
-    // 1. Ligne du haut : [● DIST IN]  [ BRITISH ]  [NUKE]
+    // 1. Ligne du haut : [● STRESS IN]  [ BRITISH ]  [NUKE]
     const float topH  = 21.0f * uiScale_;
     const float gap   = 3.0f * uiScale_;
     const float wIn   = iw * 0.36f;
@@ -363,40 +372,41 @@ void DistressorUI::resized()
     nukeBtn_.setBounds(static_cast<int>(pad + wIn + wBrit + 2.0f * gap), static_cast<int>(y), static_cast<int>(wNuke), static_cast<int>(topH));
     y += topH + 4.0f * uiScale_;
 
-    // 2. Bargraphe GR : [■][■][□][□][□][□]
-    const float grH = 26.0f * uiScale_;
-    grStripRect_ = { pad, y, iw, grH };
-    y += grH + 3.0f * uiScale_;
+    // 2. Courbe de transfert dynamique interactive
+    const float curveH = 74.0f * uiScale_;
+    transferCurve_.setBounds(static_cast<int>(pad), static_cast<int>(y), static_cast<int>(iw), static_cast<int>(curveH));
+    y += curveH + 3.0f * uiScale_;
 
     // 3. THD LEDs : (●) 1% THD   (○) 3% THD
-    const float thdH = 16.0f * uiScale_;
+    const float thdH = 15.0f * uiScale_;
     thdStripRect_ = { pad, y, iw, thdH };
     y += thdH + 3.0f * uiScale_;
 
     sepTopRect_ = { pad, y, iw, std::max(1.0f, 1.0f * uiScale_) };
     y += 4.0f * uiScale_;
 
-    // 4. Zone basse réservée : RATIO, DIST, FILTER, ROUTING (4 pilules/sélecteurs de 22.0f * uiScale)
-    const float rowPillH = 22.0f * uiScale_;
-    const float pillGap  = 3.0f * uiScale_;
+    // 4. Zone basse réservée : RATIO, DIST, FILTER, ROUTING (4 pilules/sélecteurs)
+    const float faderH    = 21.0f * uiScale_;
+    const float rowPillH  = 21.0f * uiScale_;
+    const float pillGap   = 3.0f * uiScale_;
     const float botBlockH = 4.0f * rowPillH + 3.0f * pillGap + 8.0f * uiScale_;
     const float botY = b.getHeight() - botBlockH;
     sepBotRect_ = { pad, botY - 3.0f * uiScale_, iw, std::max(1.0f, 1.0f * uiScale_) };
 
-    // 5. Zone centrale : 5 potentiomètres (INPUT/OUTPUT, ATTACK/RELEASE, BLEND centré)
-    const float knobAreaH = std::max(120.0f * uiScale_, botY - y - 6.0f * uiScale_);
+    // 5. Zone centrale : 4 potentiomètres (INPUT/OUTPUT, ATTACK/RELEASE) + BLEND TactileFaderBar
+    const float knobAreaH = std::max(84.0f * uiScale_, botY - y - faderH - 8.0f * uiScale_);
     const float colW = iw * 0.5f;
-    const float rowH = knobAreaH / 3.0f;
+    const float rowH = knobAreaH * 0.5f;
 
-    inputKnob_.setBoundsTight  (pad,        y, colW, rowH);
-    outputKnob_.setBoundsTight (pad + colW, y, colW, rowH);
+    inputKnob_.setBoundsTight  (pad,        y, colW, rowH, 54.0f);
+    outputKnob_.setBoundsTight (pad + colW, y, colW, rowH, 54.0f);
     y += rowH;
 
-    attackKnob_.setBoundsTight (pad,        y, colW, rowH);
-    releaseKnob_.setBoundsTight(pad + colW, y, colW, rowH);
-    y += rowH;
+    attackKnob_.setBoundsTight (pad,        y, colW, rowH, 48.0f);
+    releaseKnob_.setBoundsTight(pad + colW, y, colW, rowH, 48.0f);
+    y += rowH + 2.0f * uiScale_;
 
-    blendKnob_.setBoundsTight  (pad + colW * 0.5f, y, colW, rowH);
+    blendBar_.setBounds(static_cast<int>(pad), static_cast<int>(y), static_cast<int>(iw), static_cast<int>(faderH));
 
     // 6. Empilement bas : RATIO, DIST, FILTER, ROUTING
     float py = botY;

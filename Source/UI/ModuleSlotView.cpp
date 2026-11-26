@@ -143,6 +143,7 @@ void ModuleSlotView::setUiScale(float s)
     if (precisionDyn2uUI_)    precisionDyn2uUI_->setUiScale(uiScale_);
     if (harmonicSculptorUI_)  harmonicSculptorUI_->setUiScale(uiScale_);
     if (stereoPhaseUI_)       stereoPhaseUI_->setUiScale(uiScale_);
+    if (transferCurve_)       transferCurve_->setUiScale(uiScale_);
     resized();
     repaint();
 }
@@ -178,6 +179,8 @@ void ModuleSlotView::setChassisTheme(kalyx::core::ChassisTheme t)
         eqCurve_->setDarkText(darkTxt);
         eqCurve_->repaint();
     }
+    if (transferCurve_)
+        transferCurve_->setThemeColours(KalyxTheme::getAccent(theme_), darkTxt);
     if (ua1176UI_)       ua1176UI_->setChassisTheme(theme_);
     if (la2aUI_)         la2aUI_->setChassisTheme(theme_);
     if (distressorUI_)   distressorUI_->setChassisTheme(theme_);
@@ -239,11 +242,13 @@ void ModuleSlotView::updateFFTAndRepaint()
     if (!peakLedRect_.isEmpty() && peakLedLit_ != prevPeak)
         repaint(peakLedRect_.expanded(3.0f).toNearestInt());
 
+    const float pkDb = processor_.getSlotPeakDb(slotIndex_);
+
     if (ua1176UI_)
     {
         const int prevRev = ua1176UI_->getCurrentRevision();
         ua1176UI_->syncFromAPVTS();
-        ua1176UI_->setGainReductionDb(smoothedGrDb_);
+        ua1176UI_->setGainReductionDb(smoothedGrDb_, pkDb);
         if (ua1176UI_->getCurrentRevision() != prevRev)
             repaint(0, 0, getWidth(), static_cast<int>(26.0f * uiScale_));
     }
@@ -251,19 +256,49 @@ void ModuleSlotView::updateFFTAndRepaint()
     if (la2aUI_)
     {
         la2aUI_->syncFromAPVTS();
-        la2aUI_->setGainReductionDb(smoothedGrDb_);
+        la2aUI_->setGainReductionDb(smoothedGrDb_, pkDb);
     }
 
     if (distressorUI_)
     {
         distressorUI_->syncFromAPVTS();
-        distressorUI_->setTelemetry(smoothedGrDb_, processor_.getSlotThdPct(slotIndex_));
+        distressorUI_->setTelemetry(smoothedGrDb_, processor_.getSlotThdPct(slotIndex_), pkDb);
     }
 
     if (fairchildUI_)
     {
         fairchildUI_->syncFromAPVTS();
-        fairchildUI_->setTelemetry(smoothedGrDb_);
+        fairchildUI_->setTelemetry(smoothedGrDb_, pkDb);
+    }
+
+    if (transferCurve_)
+    {
+        using Mod = kalyx::core::SlotModuleId;
+        const auto mod = static_cast<Mod>(currentModuleId_);
+        const auto p   = processor_.getSlotParamsForGUI(slotIndex_);
+        if (mod == Mod::SSL4000Comp)
+        {
+            const float ratio = kalyx::core::mapLog(p[2], 1.0f, 20.0f);
+            transferCurve_->setCurveConfig(InteractiveTransferCurve::CurveType::VCA, ratio, isSslGActive_ ? 4.0f : 2.0f, lastModuleOn_, false);
+        }
+        else if (mod == Mod::API2500Comp)
+        {
+            const float ratio = kalyx::core::mapLog(p[2], 1.5f, 20.0f);
+            const int kneeIdx = kalyx::core::mapChoice(p[5], 3);
+            const float knee  = (kneeIdx == 0) ? 1.0f : ((kneeIdx == 1) ? 6.0f : 12.0f);
+            transferCurve_->setCurveConfig(InteractiveTransferCurve::CurveType::VCA, ratio, knee, lastModuleOn_, false);
+        }
+        else if (mod == Mod::Neve5254Comp)
+        {
+            static constexpr float kNeveR[5] = { 1.5f, 2.0f, 3.0f, 4.0f, 6.0f };
+            const int rIdx = kalyx::core::mapChoice(p[2], 5);
+            transferCurve_->setCurveConfig(InteractiveTransferCurve::CurveType::Diode, kNeveR[rIdx], 6.0f, lastModuleOn_, lastVintageMode_);
+        }
+        else if (mod == Mod::PrecisionLimiter)
+        {
+            transferCurve_->setCurveConfig(InteractiveTransferCurve::CurveType::Limiter, 100.0f, 0.5f, lastModuleOn_, false);
+        }
+        transferCurve_->setTelemetry(pkDb, smoothedGrDb_);
     }
 
     if (surgicalEq2uUI_)
@@ -443,6 +478,7 @@ void ModuleSlotView::rebuildControlsForModule(int modId)
     if (precisionDyn2uUI_)           { removeChildComponent(precisionDyn2uUI_.get()); }
     if (harmonicSculptorUI_)         { removeChildComponent(harmonicSculptorUI_.get()); }
     if (stereoPhaseUI_)              { removeChildComponent(stereoPhaseUI_.get()); }
+    if (transferCurve_)              { removeChildComponent(transferCurve_.get()); }
 
     lastPartnerSlot_ = kalyx::core::isModuleId2U(modId) ? processor_.getPartnerSlotFor2U(slotIndex_) : -1;
 
@@ -454,6 +490,7 @@ void ModuleSlotView::rebuildControlsForModule(int modId)
     toggles_.clear();
     toggleAtts_.clear();
     eqCurve_.reset();
+    transferCurve_.reset();
     ua1176UI_.reset();
     la2aUI_.reset();
     distressorUI_.reset();
@@ -584,6 +621,9 @@ void ModuleSlotView::rebuildControlsForModule(int modId)
                                   "Switch SSL VCA circuit between 4000 E (feedback RMS) and 4000 G (feedforward Bus)");
 
             addKnob(2,  "THRESH",  accent, cap, fmtDb(-40.f, 0.f),     "VCA Compression Threshold (-40 to 0 dB)", 0, false, parseDb(-40.f, 0.f));
+            transferCurve_ = std::make_unique<InteractiveTransferCurve>();
+            transferCurve_->init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 2), -40.0f, 0.0f, defs[1], false, accent, darkTxt,
+                                 "Dynamic VCA Transfer Curve (Drag to adjust Threshold)");
             addKnob(3,  "RATIO",   accent, cap, fmtRatioLog(1.f, 20.f),"Compression Ratio (1.0:1 to 20.0:1)", 7, false, parseRatioLog(1.f, 20.f));
             addKnob(4,  "ATTACK",  accent, cap, fmtMsLog(0.5f, 50.f),  "VCA Attack Time (0.5 to 50 ms)", 0, false, parseMsLog(0.5f, 50.f));
             releaseKnob_ = addKnob(5, "RELEASE", accent, cap, fmtMsLog(20.f, 1000.f), "Manual Release Time (disabled when AUTO RC is active)", 0, false, parseMsLog(20.f, 1000.f));
@@ -610,6 +650,9 @@ void ModuleSlotView::rebuildControlsForModule(int modId)
             addTog(8, "OLD FB",  KalyxTheme::amberLed, "OLD (Feedback vintage) vs NEW (Feedforward modern) detector topology");
 
             addKnob(2,  "THRESH",   cyan,   cap, fmtDb(-40.f, 0.f),      "API 2500 Threshold (-40 to 0 dB)", 0, false, parseDb(-40.f, 0.f));
+            transferCurve_ = std::make_unique<InteractiveTransferCurve>();
+            transferCurve_->init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 2), -40.0f, 0.0f, defs[1], false, cobalt, darkTxt,
+                                 "Dynamic VCA Transfer Curve (Drag to adjust Threshold)");
             addKnob(3,  "RATIO",    cobalt, cap, fmtRatioLog(1.5f, 20.f),"Stepped API 2500 Compression Ratio (1.5:1 to 20:1)", 7, false, parseRatioLog(1.5f, 20.f));
             addKnob(4,  "ATTACK",   cyan,   cap, fmtMsLog(0.3f, 30.f),   "Attack Time (0.3 to 30 ms)", 0, false, parseMsLog(0.3f, 30.f));
 
@@ -688,6 +731,9 @@ void ModuleSlotView::rebuildControlsForModule(int modId)
 
             threshKnob_ = addKnob(2, "THRESH", brick, cap, fmtNeve5254Db(-40.f, 0.f),  "Diode-Bridge Threshold (-40 to 0 dB, 2 dB steps in VINTAGE)", 21, false, parseDb(-40.f, 0.f));
             threshKnob_->setSteppedMode(lastVintageMode_, 21);
+            transferCurve_ = std::make_unique<InteractiveTransferCurve>();
+            transferCurve_->init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 2), -40.0f, 0.0f, defs[1], false, brick, darkTxt,
+                                 "Dynamic Diode-Bridge Transfer Curve (Drag to adjust Threshold)");
             addKnob(6, "SC HPF", steel, cap, fmtHzLog(20.f, 250.f), "Sidechain High-Pass Filter (20 - 250 Hz)", 0, false, parseHzLog(20.f, 250.f));
             gainKnob_   = addKnob(7, "GAIN",   brick, cap, fmtNeve5254Db(-12.f, 24.f), "Class-A Output Makeup Gain (-12 to +24 dB, 2 dB steps in VINTAGE)", 19, false, parseDb(-12.f, 24.f));
             gainKnob_->setSteppedMode(lastVintageMode_, 19);
@@ -898,6 +944,9 @@ void ModuleSlotView::rebuildControlsForModule(int modId)
             addTog(1, "LIMIT IN", KalyxTheme::alertRed, "Engage Precision Peak Limiter");
             addTog(4, "AUTO REL", aub, "Program-dependent Auto-Release (disables manual LIMIT REL)");
             addKnob(2, "LIMIT THR", blu, cap, fmtDb(-30.f, 0.f),    "Peak Limiter Threshold (-30 to 0 dB)", 13, false, parseDb(-30.f, 0.f));
+            transferCurve_ = std::make_unique<InteractiveTransferCurve>();
+            transferCurve_->init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 2), -30.0f, 0.0f, defs[1], false, blu, darkTxt,
+                                 "Brickwall Limiter Transfer Curve (Drag to adjust Threshold)");
             releaseKnob_ = addKnob(3, "LIMIT REL", blu, cap, fmtMsLog(10.f, 500.f), "Manual Limiter Release Time (disabled when AUTO REL is active)", 13, false, parseMsLog(10.f, 500.f));
             addKnob(5, "CEILING",   aub, cap, fmtDb(-24.f, 0.f),    "True Output Brickwall Ceiling (-24 to 0 dBFS)", 13, false, parseDb(-24.f, 0.f));
             addKnob(6, "BLEND",     blu, cap, fmtPct(),             "Parallel Dry/Wet Blend (0 - 100 %)", 13, false, parsePct());
@@ -1280,14 +1329,24 @@ void ModuleSlotView::resized()
             y += 23.0f * uiScale_;
         }
 
-        // Barre 6-LED GR
-        ledMeterRect_ = { pad, y, innerW, 27.0f * uiScale_ };
-        y += 30.0f * uiScale_;
+        // Courbe de transfert dynamique (remplace la barre LED passive)
+        if (transferCurve_)
+        {
+            const float cH = 62.0f * uiScale_;
+            transferCurve_->setBounds(static_cast<int>(pad), static_cast<int>(y), static_cast<int>(innerW), static_cast<int>(cH));
+            ledMeterRect_ = {};
+            y += cH + 4.0f * uiScale_;
+        }
+        else
+        {
+            ledMeterRect_ = { pad, y, innerW, 27.0f * uiScale_ };
+            y += 30.0f * uiScale_;
+        }
 
         // Zone basse réservée : 3 pilules segmentées (KNEE, THRUST, LINK FLT) + ROUTING
         const float pillGap = 3.0f * uiScale_;
         const float bottomH = 4.0f * pillH + 3.0f * pillGap + 6.0f * uiScale_;
-        const float knobAreaH = std::max(130.0f * uiScale_, b.getHeight() - y - bottomH - 4.0f * uiScale_);
+        const float knobAreaH = std::max(115.0f * uiScale_, b.getHeight() - y - bottomH - 4.0f * uiScale_);
 
         const float colW = innerW * 0.5f;
         const float rH   = (knobAreaH - pillH - 2.0f * uiScale_) / 4.0f;
@@ -1328,7 +1387,7 @@ void ModuleSlotView::resized()
     }
 
     // =========================================================================
-    // Layout matériel dédié : Neve 5254 (PEAK LED + 6-LED GR + 2 Rotatifs crantés + LINK + < ROUTING >)
+    // Layout matériel dédié : Class-A 54 Diode (PEAK LED + Transfer Curve + 2 Rotatifs crantés + LINK + < ROUTING >)
     // =========================================================================
     if (mod == Mod::Neve5254Comp)
     {
@@ -1342,11 +1401,21 @@ void ModuleSlotView::resized()
         peakLedRect_ = { pad + 2.0f * bw + 6.0f * uiScale_, y, peakW, 20.0f * uiScale_ };
         y += 23.0f * uiScale_;
 
-        ledMeterRect_ = { pad, y, innerW, 27.0f * uiScale_ };
-        y += 30.0f * uiScale_;
+        if (transferCurve_)
+        {
+            const float cH = 66.0f * uiScale_;
+            transferCurve_->setBounds(static_cast<int>(pad), static_cast<int>(y), static_cast<int>(innerW), static_cast<int>(cH));
+            ledMeterRect_ = {};
+            y += cH + 4.0f * uiScale_;
+        }
+        else
+        {
+            ledMeterRect_ = { pad, y, innerW, 27.0f * uiScale_ };
+            y += 30.0f * uiScale_;
+        }
 
         const float bottomH = 2.0f * pillH + 8.0f * uiScale_;
-        const float bodyH   = std::max(140.0f * uiScale_, b.getHeight() - y - bottomH - 4.0f * uiScale_);
+        const float bodyH   = std::max(120.0f * uiScale_, b.getHeight() - y - bottomH - 4.0f * uiScale_);
         const float colW    = innerW * 0.5f;
         const float rowH    = bodyH / 3.0f;
 
@@ -1432,7 +1501,14 @@ void ModuleSlotView::resized()
         y += pillH + 4.0f * uiScale_;
     }
 
-    if (mod == Mod::ConsoleColor || mod == Mod::PrecisionLimiter || mod == Mod::SSL4000Comp)
+    if (transferCurve_)
+    {
+        const float cH = 74.0f * uiScale_;
+        transferCurve_->setBounds(static_cast<int>(pad), static_cast<int>(y), static_cast<int>(innerW), static_cast<int>(cH));
+        ledMeterRect_ = {};
+        y += cH + 4.0f * uiScale_;
+    }
+    else if (mod == Mod::ConsoleColor)
     {
         ledMeterRect_ = { pad, y, innerW, 27.0f * uiScale_ };
         y += 30.0f * uiScale_;

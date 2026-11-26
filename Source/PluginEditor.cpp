@@ -73,11 +73,11 @@ KalyxHybridConsoleEditor::KalyxHybridConsoleEditor(KalyxHybridConsoleProcessor& 
     // -------------------------------------------------------------------------
     // Tranche Fixe 1 : INPUT (adopte la finition historique du préampli sélectionné)
     // -------------------------------------------------------------------------
-    inPreampBox_.addItem("SSL 4000 E",  1);
-    inPreampBox_.addItem("SSL 4000 G",  2);
-    inPreampBox_.addItem("API 2520",    3);
-    inPreampBox_.addItem("Neve 1073",   4);
-    inPreampBox_.addItem("Kalyx Clean", 5);
+    inPreampBox_.addItem("British 4K-E", 1);
+    inPreampBox_.addItem("British 4K-G", 2);
+    inPreampBox_.addItem("American 25",  3);
+    inPreampBox_.addItem("Class-A 73",   4);
+    inPreampBox_.addItem("Kalyx Clean",  5);
     inPreampBox_.setTooltip("Select Input Preamp Circuit & Historical Faceplate Finish");
     addAndMakeVisible(inPreampBox_);
     inPreampAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, ParamIDs::inPreampModel, inPreampBox_);
@@ -85,26 +85,18 @@ KalyxHybridConsoleEditor::KalyxHybridConsoleEditor(KalyxHybridConsoleProcessor& 
     const auto accent = KalyxTheme::getAccent(lastTheme_);
     auto fmtRawDb  = [](double v) { return KalyxValueParsers::formatDbClean(v); };
     auto fmtRawPct = [](double v) { return juce::String(juce::roundToInt(v)) + " %"; };
-    auto fmtRawHz  = [](double v) { return (v >= 1000.0) ? (juce::String(v * 0.001, 1) + " kHz") : (juce::String(juce::roundToInt(v)) + " Hz"); };
 
-    inTrimCtrl_.init   (*this, apvts, ParamIDs::inTrim,    "IN TRIM",  accent, juce::Colours::transparentBlack, isDay, 0.0, fmtRawDb,  "Input Preamp Trim Gain (-24 to +24 dB)",
-                        KalyxValueParsers::parseRawClamped(-24.0, 24.0));
-    inDriveCtrl_.init  (*this, apvts, ParamIDs::inDrive,   "DRIVE",    KalyxTheme::kalyxRoseParme, juce::Colours::transparentBlack, isDay, 0.0, fmtRawPct, "Input Transformer & Preamp ADAA Saturation Drive (0 - 100 %)",
-                        KalyxValueParsers::parseRawClamped(0.0, 100.0));
-    inHpfFreqCtrl_.init(*this, apvts, ParamIDs::inHpfFreq, "HPF",      accent, juce::Colours::transparentBlack, isDay, 40.0, fmtRawHz, "Input 18 dB/oct ZDF High-Pass Filter (20 - 500 Hz)",
-                        KalyxValueParsers::parseRawClamped(20.0, 500.0, true));
-    inLpfFreqCtrl_.init(*this, apvts, ParamIDs::inLpfFreq, "LPF",      accent, juce::Colours::transparentBlack, isDay, 18000.0, fmtRawHz, "Input 12 dB/oct ZDF Low-Pass Filter (2 - 20 kHz)",
-                        KalyxValueParsers::parseRawClamped(2000.0, 20000.0, true));
+    inTrimBar_.init (*this, apvts, ParamIDs::inTrim,  "IN TRIM", accent, true,  isDay, 0.0, fmtRawDb,  "Input Preamp Trim Gain (-24 to +24 dB)",
+                     KalyxValueParsers::parseRawClamped(-24.0, 24.0));
+    inDriveBar_.init(*this, apvts, ParamIDs::inDrive, "DRIVE",   KalyxTheme::kalyxRoseParme, false, isDay, 0.0, fmtRawPct, "Input Transformer & Preamp ADAA Saturation Drive (0 - 100 %)",
+                     KalyxValueParsers::parseRawClamped(0.0, 100.0));
+    inFilterGraph_.init(*this, apvts, ParamIDs::inHpfEn, ParamIDs::inHpfFreq, ParamIDs::inLpfEn, ParamIDs::inLpfFreq, accent, isDay);
 
     setupKalyxToggle(*this, inPhaseBtn_,    inPhaseAtt_,    apvts, ParamIDs::inPhase,    "PHASE",    KalyxTheme::alertRed, isDay);
-    setupKalyxToggle(*this, inHpfBtn_,      inHpfAtt_,      apvts, ParamIDs::inHpfEn,    "HPF IN",   accent, isDay);
-    setupKalyxToggle(*this, inLpfBtn_,      inLpfAtt_,      apvts, ParamIDs::inLpfEn,    "LPF IN",   accent, isDay);
     setupKalyxToggle(*this, inFiltToScBtn_, inFiltToScAtt_, apvts, ParamIDs::inFiltToSc, "FILT>SC",  accent, isDay);
     setupKalyxToggle(*this, inExtScBtn_,    inExtScAtt_,    apvts, ParamIDs::inExtSc,    "EXT SC",   accent, isDay);
     setupKalyxToggle(*this, inScListenBtn_, inScListenAtt_, apvts, ParamIDs::inScListen, "SC LSTN",  KalyxTheme::amberLed, isDay);
     inPhaseBtn_.setTooltip("Invert Input Polarity by 180 degrees");
-    inHpfBtn_.setTooltip("Engage Input High-Pass Filter");
-    inLpfBtn_.setTooltip("Engage Input Low-Pass Filter");
     inFiltToScBtn_.setTooltip("Route Input HPF/LPF to the Dynamics Sidechain instead of main audio");
     inExtScBtn_.setTooltip("Use External Sidechain Bus (Inputs 3-4) for Dynamics modules");
     inScListenBtn_.setTooltip("Audition the Sidechain signal directly on Main Output");
@@ -130,12 +122,12 @@ KalyxHybridConsoleEditor::KalyxHybridConsoleEditor(KalyxHybridConsoleProcessor& 
         "Monitor IN, OUT, or Cumulative Gain Reduction (GR) on the Master VU Meter");
     addAndMakeVisible(*vuModePill_);
 
-    analogTolCtrl_.init(*this, apvts, ParamIDs::masterAnalogTol, "ANALOG TOL", KalyxTheme::kalyxAubergine, juce::Colours::transparentBlack, isDay, 25.0, fmtRawPct, "Analog Component Tolerance L/R Micro-Mismatch (0 - 100 %)",
-                        KalyxValueParsers::parseRawClamped(0.0, 100.0));
-    mixCtrl_.init      (*this, apvts, ParamIDs::masterMix,       "MIX",        accent, juce::Colours::transparentBlack, isDay, 100.0, fmtRawPct, "Global Parallel Dry/Wet Mix (0 - 100 %)",
-                        KalyxValueParsers::parseRawClamped(0.0, 100.0));
-    outFaderCtrl_.init (*this, apvts, ParamIDs::masterOutGain,   "OUT FADER",  accent, juce::Colours::transparentBlack, isDay, 0.0, fmtRawDb, "Master Output Fader (-24 to +12 dB)",
-                        KalyxValueParsers::parseRawClamped(-24.0, 12.0));
+    analogTolBar_.init(*this, apvts, ParamIDs::masterAnalogTol, "ANALOG TOL", KalyxTheme::kalyxAubergine, false, isDay, 25.0, fmtRawPct,
+                       "Analog Component Tolerance L/R Micro-Mismatch (0 - 100 %)", KalyxValueParsers::parseRawClamped(0.0, 100.0));
+    mixBar_.init      (*this, apvts, ParamIDs::masterMix,       "MIX",        accent, false, isDay, 100.0, fmtRawPct,
+                       "Global Parallel Dry/Wet Mix (0 - 100 %)", KalyxValueParsers::parseRawClamped(0.0, 100.0));
+    outFader_.init    (*this, apvts, ParamIDs::masterOutGain,   "OUT FADER",  accent, isDay, -24.0, 12.0, 0.0,
+                       "Master Output Fader (-24 to +12 dB, magnetic 0.0 dB detent)");
 
     addChildComponent(settingsOverlay_);
 
@@ -180,17 +172,11 @@ void KalyxHybridConsoleEditor::applyInputPreampTheme(int preampModel)
         default:arcCol = KalyxTheme::kalyxRoyalBlueGlow; break; // Kalyx Clean
     }
 
-    inTrimCtrl_.setTextDark(darkTxt);
-    inDriveCtrl_.setTextDark(darkTxt);
-    inHpfFreqCtrl_.setTextDark(darkTxt);
-    inLpfFreqCtrl_.setTextDark(darkTxt);
+    inTrimBar_.setThemeColours(arcCol, darkTxt);
+    inDriveBar_.setThemeColours(KalyxTheme::kalyxAubergineHover, darkTxt);
+    inFilterGraph_.setThemeColours(arcCol, darkTxt);
 
-    inTrimCtrl_.setCapAndArcColour(arcCol, capCol);
-    inDriveCtrl_.setCapAndArcColour(KalyxTheme::kalyxAubergineHover, capCol);
-    inHpfFreqCtrl_.setCapAndArcColour(arcCol, capCol);
-    inLpfFreqCtrl_.setCapAndArcColour(arcCol, capCol);
-
-    juce::ToggleButton* inTogs[] = { &inPhaseBtn_, &inHpfBtn_, &inLpfBtn_, &inFiltToScBtn_, &inExtScBtn_, &inScListenBtn_ };
+    juce::ToggleButton* inTogs[] = { &inPhaseBtn_, &inFiltToScBtn_, &inExtScBtn_, &inScListenBtn_ };
     for (auto* t : inTogs) t->setColour(juce::ToggleButton::textColourId, txtCol);
     repaint();
 }
@@ -207,13 +193,10 @@ void KalyxHybridConsoleEditor::applyChassisTheme(kalyx::core::ChassisTheme theme
     const auto idleBg  = KalyxTheme::getControlIdleBg(theme);
     const auto accent  = KalyxTheme::getAccent(theme);
     const auto primary = KalyxTheme::getPrimary(theme);
-    const auto capCol  = idleBg;
 
-    KalyxRotaryControl* mastKnobs[] = { &analogTolCtrl_, &mixCtrl_, &outFaderCtrl_ };
-    for (auto* k : mastKnobs) k->setTextDark(isDay);
-    analogTolCtrl_.setCapAndArcColour(primary, capCol);
-    mixCtrl_.setCapAndArcColour(accent, capCol);
-    outFaderCtrl_.setCapAndArcColour(accent, capCol);
+    analogTolBar_.setThemeColours(primary, isDay);
+    mixBar_.setThemeColours(accent, isDay);
+    outFader_.setThemeColours(accent, isDay);
 
     juce::TextButton* hdrBtns[] = { &presetMenuBtn_, &saveBtn_, &saveAsBtn_, &renameBtn_, &deleteBtn_, &abCopyBtn_, &settingsBtn_ };
     for (auto* b : hdrBtns)
@@ -514,7 +497,14 @@ void KalyxHybridConsoleEditor::paint(juce::Graphics& g)
     g.setFont(juce::Font(juce::FontOptions(13.5f * uiScale_, juce::Font::bold)));
     g.drawText("KALYX // HYBRID CONSOLE",
                static_cast<int>(14.0f * uiScale_), static_cast<int>(margin),
-               static_cast<int>(198.0f * uiScale_), static_cast<int>(hdrH),
+               static_cast<int>(184.0f * uiScale_), static_cast<int>(hdrH),
+               juce::Justification::centredLeft);
+
+    g.setColour(KalyxTheme::getTextSecondary(lastTheme_));
+    g.setFont(juce::Font(juce::FontOptions(10.5f * uiScale_, juce::Font::plain)));
+    g.drawText(juce::String("v") + JucePlugin_VersionString,
+               static_cast<int>(196.0f * uiScale_), static_cast<int>(margin + 1.0f * uiScale_),
+               static_cast<int>(48.0f * uiScale_), static_cast<int>(hdrH),
                juce::Justification::centredLeft);
 
     const juce::String stat = juce::String::formatted("GR: -%4.1f dB", meterSnap_.cumulativeGrDb);
@@ -623,13 +613,12 @@ void KalyxHybridConsoleEditor::resized()
     vuMeter_.setUiScale(uiScale);
     if (vuModePill_) vuModePill_->setUiScale(uiScale);
 
-    inTrimCtrl_.setUiScale(uiScale);
-    inDriveCtrl_.setUiScale(uiScale);
-    inHpfFreqCtrl_.setUiScale(uiScale);
-    inLpfFreqCtrl_.setUiScale(uiScale);
-    analogTolCtrl_.setUiScale(uiScale);
-    mixCtrl_.setUiScale(uiScale);
-    outFaderCtrl_.setUiScale(uiScale);
+    inTrimBar_.setUiScale(uiScale);
+    inDriveBar_.setUiScale(uiScale);
+    inFilterGraph_.setUiScale(uiScale);
+    analogTolBar_.setUiScale(uiScale);
+    mixBar_.setUiScale(uiScale);
+    outFader_.setUiScale(uiScale);
 
     settingsOverlay_.setBounds(getLocalBounds());
 
@@ -645,19 +634,19 @@ void KalyxHybridConsoleEditor::resized()
 
         const float m  = 2.0f * uiScale;
         const float bh = 23.0f * uiScale;
-        fb.items.add(juce::FlexItem(presetMenuBtn_).withWidth(164.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, m }));
-        fb.items.add(juce::FlexItem(saveBtn_).withWidth(42.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, m }));
-        fb.items.add(juce::FlexItem(saveAsBtn_).withWidth(56.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, m }));
-        fb.items.add(juce::FlexItem(renameBtn_).withWidth(36.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, m }));
-        fb.items.add(juce::FlexItem(deleteBtn_).withWidth(36.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, m }));
-        fb.items.add(juce::FlexItem(abToggleBtn_).withWidth(48.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, 5.0f * uiScale }));
-        fb.items.add(juce::FlexItem(abCopyBtn_).withWidth(44.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, m }));
-        fb.items.add(juce::FlexItem(msModeBox_).withWidth(112.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, 5.0f * uiScale }));
-        fb.items.add(juce::FlexItem(chassisThemeBox_).withWidth(134.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, m }));
-        fb.items.add(juce::FlexItem(settingsBtn_).withWidth(68.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, m }));
+        fb.items.add(juce::FlexItem(presetMenuBtn_).withWidth(160.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, m }));
+        fb.items.add(juce::FlexItem(saveBtn_).withWidth(40.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, m }));
+        fb.items.add(juce::FlexItem(saveAsBtn_).withWidth(54.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, m }));
+        fb.items.add(juce::FlexItem(renameBtn_).withWidth(34.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, m }));
+        fb.items.add(juce::FlexItem(deleteBtn_).withWidth(34.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, m }));
+        fb.items.add(juce::FlexItem(abToggleBtn_).withWidth(46.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, 4.0f * uiScale }));
+        fb.items.add(juce::FlexItem(abCopyBtn_).withWidth(42.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, m }));
+        fb.items.add(juce::FlexItem(msModeBox_).withWidth(110.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, 4.0f * uiScale }));
+        fb.items.add(juce::FlexItem(chassisThemeBox_).withWidth(130.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, m }));
+        fb.items.add(juce::FlexItem(settingsBtn_).withWidth(66.0f * uiScale).withHeight(bh).withMargin({ 0, m, 0, m }));
 
-        const float leftX  = 214.0f * uiScale;
-        const float rightW = 216.0f * uiScale;
+        const float leftX  = 244.0f * uiScale;
+        const float rightW = 200.0f * uiScale;
         fb.performLayout(juce::Rectangle<float>(leftX, margin, std::max(100.0f, bounds.getWidth() - leftX - rightW), hdrH));
     }
 
@@ -684,21 +673,19 @@ void KalyxHybridConsoleEditor::resized()
         const float pillH = 22.0f * uiScale;
         inPreampBox_.setBounds(static_cast<int>(curX + pad), static_cast<int>(y), static_cast<int>(iw - ledsW - 2.0f * uiScale), static_cast<int>(pillH));
         inLedsRect_ = { curX + pad + iw - ledsW, y, ledsW, pillH };
-        y += pillH + 4.0f * uiScale;
+        y += pillH + 5.0f * uiScale;
 
-        inPhaseBtn_.setBounds(static_cast<int>(curX + pad), static_cast<int>(y), static_cast<int>(iw), static_cast<int>(20.0f * uiScale));
-        y += 23.0f * uiScale;
+        inPhaseBtn_.setBounds(static_cast<int>(curX + pad), static_cast<int>(y), static_cast<int>(iw), static_cast<int>(21.0f * uiScale));
+        y += 26.0f * uiScale;
 
-        const float knobH = (panelH - 184.0f * uiScale) / 4.0f;
-        inTrimCtrl_.setBoundsTight (curX + pad, y, iw, knobH); y += knobH + 2.0f * uiScale;
-        inDriveCtrl_.setBoundsTight(curX + pad, y, iw, knobH); y += knobH + 2.0f * uiScale;
+        const float barH = 24.0f * uiScale;
+        inTrimBar_.setBounds (static_cast<int>(curX + pad), static_cast<int>(y), static_cast<int>(iw), static_cast<int>(barH)); y += barH + 5.0f * uiScale;
+        inDriveBar_.setBounds(static_cast<int>(curX + pad), static_cast<int>(y), static_cast<int>(iw), static_cast<int>(barH)); y += barH + 8.0f * uiScale;
 
-        inHpfBtn_.setBounds(static_cast<int>(curX + pad),                 static_cast<int>(y), static_cast<int>(hw), static_cast<int>(20.0f * uiScale));
-        inLpfBtn_.setBounds(static_cast<int>(curX + pad + hw + 3.0f * uiScale), static_cast<int>(y), static_cast<int>(hw), static_cast<int>(20.0f * uiScale));
-        y += 23.0f * uiScale;
-
-        inHpfFreqCtrl_.setBoundsTight(curX + pad, y, iw, knobH); y += knobH + 2.0f * uiScale;
-        inLpfFreqCtrl_.setBoundsTight(curX + pad, y, iw, knobH); y += knobH + 4.0f * uiScale;
+        const float botBtnsH = 48.0f * uiScale;
+        const float graphH   = std::max(72.0f * uiScale, (topY + panelH - 8.0f * uiScale - botBtnsH) - y);
+        inFilterGraph_.setBounds(static_cast<int>(curX + pad), static_cast<int>(y), static_cast<int>(iw), static_cast<int>(graphH));
+        y += graphH + 8.0f * uiScale;
 
         inFiltToScBtn_.setBounds(static_cast<int>(curX + pad), static_cast<int>(y), static_cast<int>(iw), static_cast<int>(20.0f * uiScale));
         y += 23.0f * uiScale;
@@ -737,7 +724,7 @@ void KalyxHybridConsoleEditor::resized()
         }
     }
 
-    // Tranche Fixe 7 : MASTER (Compact 300 ms Analog VU Meter + [IN|OUT|GR] + Auto-Gain, Tol, Mix, Out Fader)
+    // Tranche Fixe 7 : MASTER (Compact 300 ms Analog VU Meter + [IN|OUT|GR] + TactileFaderBar Tol/Mix + VerticalConsoleFader)
     const float finalMastW = bounds.getWidth() - margin - curX;
     masterPanelRect_ = { curX, topY, finalMastW, panelH };
     {
@@ -751,12 +738,14 @@ void KalyxHybridConsoleEditor::resized()
         const float pillH = 22.0f * uiScale;
         if (vuModePill_)
             vuModePill_->setBounds(static_cast<int>(curX + pad), static_cast<int>(y), static_cast<int>(iw), static_cast<int>(pillH));
-        y += pillH + 6.0f * uiScale;
+        y += pillH + 8.0f * uiScale;
 
-        const float knobH = (panelH - (y - topY) - 6.0f * uiScale) / 3.0f;
-        analogTolCtrl_.setBoundsTight(curX + pad, y, iw, knobH); y += knobH;
-        mixCtrl_.setBoundsTight      (curX + pad, y, iw, knobH); y += knobH;
-        outFaderCtrl_.setBoundsTight (curX + pad, y, iw, knobH);
+        const float barH = 24.0f * uiScale;
+        analogTolBar_.setBounds(static_cast<int>(curX + pad), static_cast<int>(y), static_cast<int>(iw), static_cast<int>(barH)); y += barH + 5.0f * uiScale;
+        mixBar_.setBounds      (static_cast<int>(curX + pad), static_cast<int>(y), static_cast<int>(iw), static_cast<int>(barH)); y += barH + 10.0f * uiScale;
+
+        const float faderH = std::max(80.0f * uiScale, (topY + panelH - 6.0f * uiScale) - y);
+        outFader_.setBounds(static_cast<int>(curX + pad), static_cast<int>(y), static_cast<int>(iw), static_cast<int>(faderH));
     }
 }
 

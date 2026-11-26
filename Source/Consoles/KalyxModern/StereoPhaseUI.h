@@ -4,6 +4,7 @@
 #include "../../Core/ConsoleModuleBase.h"
 #include "../../PluginProcessor.h"
 #include "../../UI/KalyxLookAndFeel.h"
+#include "../../UI/DataWidgets.h"
 #include <array>
 #include <memory>
 
@@ -11,9 +12,11 @@ namespace kalyx::consoles
 {
 
 /**
- * Façade « Tactile Flat » 1U du Kalyx Stereo & Phase Studio.
- * Inclut un Corrélomètre de Phase temps réel (-1 à +1), Mono Maker, Stereo Width,
- * Phase Rotate, Side Tilt, Mid/Side Gains, Ø L / Ø R / L<>R et Monitor (STEREO / MID / SIDE).
+ * Façade « Data-Driven 2D » 1U de Kalyx Spatial Vector (ex-Stereo & Phase Studio).
+ * - Corrélomètre temps réel (-1..+1)
+ * - 4 gros potentiomètres : WIDTH, MONO MAKER, PHASE ROT, SIDE TILT
+ * - 2 barres TactileFaderBar bipolaires : MID GAIN, SIDE GAIN
+ * - Ø L, Ø R, L<>R et MONITOR [STEREO | MID | SIDE]
  */
 class StereoPhaseUI final : public juce::Component
 {
@@ -38,11 +41,12 @@ private:
     kalyx::core::ChassisTheme theme_ { kalyx::core::ChassisTheme::Night };
     float correlation_ { 1.0f };
 
-    juce::ToggleButton inBtn_ { "STEREO STUDIO" };
+    juce::ToggleButton inBtn_ { "SPATIAL IN" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> inAtt_;
 
     std::unique_ptr<KalyxSegmentedPill> modePill_;
-    std::array<std::unique_ptr<KalyxRotaryControl>, 6> knobs_;
+    std::array<std::unique_ptr<KalyxRotaryControl>, 4> knobs_;
+    TactileFaderBar midGainBar_, sideGainBar_;
 
     juce::ToggleButton invLBtn_ { "O L" };
     juce::ToggleButton invRBtn_ { "O R" };

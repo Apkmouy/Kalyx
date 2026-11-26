@@ -4,6 +4,7 @@
 #include "../../Core/ConsoleModuleBase.h"
 #include "../../PluginProcessor.h"
 #include "../../UI/KalyxLookAndFeel.h"
+#include "../../UI/DataWidgets.h"
 #include <array>
 #include <memory>
 
@@ -11,7 +12,11 @@ namespace kalyx::consoles
 {
 
 /**
- * Façade « Tactile Flat » 1U du Kalyx Harmonic Sculptor (EVEN 2nd / ODD 3rd / TILT LNK / DYNAMICS / SAT BAND).
+ * Façade « Data-Driven 2D » 1U de Kalyx Harmonic Matrix (ex-Harmonic Sculptor).
+ * - Pad 2D Vectoriel EVEN (X) x ODD (Y)
+ * - 2 potentiomètres principaux : TILT EQ, DYNAMICS
+ * - 2 barres TactileFaderBar : DRIVE, BLEND
+ * - Sélecteurs BAND [FULL|LOW|MID|HI] et ROUTING
  */
 class HarmonicSculptorUI final : public juce::Component
 {
@@ -36,13 +41,15 @@ private:
     kalyx::core::ChassisTheme theme_ { kalyx::core::ChassisTheme::Night };
     float thdPct_ { 0.0f };
 
-    juce::ToggleButton inBtn_ { "HARMONIC" };
+    juce::ToggleButton inBtn_ { "MATRIX IN" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> inAtt_;
 
     juce::ToggleButton tiltLinkBtn_ { "TILT LNK" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> tiltLinkAtt_;
 
-    std::array<std::unique_ptr<KalyxRotaryControl>, 6> knobs_;
+    VectorPad2D evenOddPad_;
+    std::array<std::unique_ptr<KalyxRotaryControl>, 2> knobs_; // TILT EQ, DYNAMICS
+    TactileFaderBar driveBar_, blendBar_;
     std::unique_ptr<KalyxSegmentedPill> bandPill_;
     std::unique_ptr<KalyxArrowSelector> routingSelector_;
 

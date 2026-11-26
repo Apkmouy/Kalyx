@@ -1362,7 +1362,7 @@ void KalyxSettingsOverlayComponent::mouseDown(const juce::MouseEvent& e)
 void KalyxSettingsOverlayComponent::paint(juce::Graphics& g)
 {
     g.fillAll(juce::Colours::black.withAlpha(0.58f));
-    const auto card = getLocalBounds().withSizeKeepingCentre(440, 260).toFloat();
+    const auto card = getLocalBounds().withSizeKeepingCentre(440, 278).toFloat();
     g.setColour(KalyxTheme::getStripBg(theme_));
     g.fillRoundedRectangle(card, 5.0f);
 
@@ -1382,11 +1382,17 @@ void KalyxSettingsOverlayComponent::paint(juce::Graphics& g)
     g.drawText("1. 0 VU REFERENCE CALIBRATION (300 ms IEC) :", lx, cy + 40,  380, 15, juce::Justification::centredLeft);
     g.drawText("2. NON-LINEAR DSP OVERSAMPLING (ADAA + OS) :", lx, cy + 124, 380, 15, juce::Justification::centredLeft);
     g.drawText("3. EQ REAL-TIME FFT SPECTRUM ANALYZER :",      lx, cy + 186, 380, 15, juce::Justification::centredLeft);
+
+    g.setColour(KalyxTheme::getTextSecondary(theme_));
+    g.setFont(juce::Font(juce::FontOptions(9.5f, juce::Font::plain)));
+    g.drawText(juce::String("Kalyx Hybrid Console v") + JucePlugin_VersionString + " — Build " + __DATE__,
+               lx, static_cast<int>(card.getBottom() - 22.0f), static_cast<int>(card.getWidth() - 36.0f), 16,
+               juce::Justification::centred);
 }
 
 void KalyxSettingsOverlayComponent::resized()
 {
-    const auto card = getLocalBounds().withSizeKeepingCentre(440, 260);
+    const auto card = getLocalBounds().withSizeKeepingCentre(440, 278);
     const int cx = card.getX() + 18, cy = card.getY(), iw = card.getWidth() - 36;
     closeBtn_.setBounds(card.getRight() - 32, cy + 3, 24, 24);
 

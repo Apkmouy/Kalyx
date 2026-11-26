@@ -4,6 +4,7 @@
 #include "../../Core/ConsoleModuleBase.h"
 #include "../../PluginProcessor.h"
 #include "../../UI/KalyxLookAndFeel.h"
+#include "../../UI/DataWidgets.h"
 #include "LA2ADSP.h"
 #include <array>
 #include <memory>
@@ -12,15 +13,7 @@ namespace kalyx::consoles
 {
 
 /**
- * Façade matérielle Série 500 authentique du compresseur optique Teletronix LA-2A.
- * Rendu 100 % vectoriel juce::Graphics :
- * - Châssis gris acier martelé vintage (#7A8088) avec sérigraphie noire nette, bordures chromées fines
- *   et voyant témoin ambré chaleureux à côté de [● LA-2A IN]
- * - Commutateur [ LIMIT | COMP ] à 2 positions en haut à droite
- * - Barre GR 6-LEDs : GR: (●)-1 (●)-2 (○)-4 -6 -10 -20
- * - Gros boutons bakélite noirs à repère blanc pour GAIN & PEAK REDUCTION
- * - Petits boutons secondaires pour R37 EMPHASIS, CELL AGE & BLEND
- * - Conventions du châssis (Double-clic = Reset, Shift/Ctrl + Glisser = Réglage fin, zéro troncature à 80 %).
+ * Façade matérielle Série 500 Data-Driven du compresseur optique Opto-2A (ex-Teletronix LA-2A).
  */
 class LA2AUI final : public juce::Component
 {
@@ -31,7 +24,7 @@ public:
     void setUiScale(float s);
     void setChassisTheme(kalyx::core::ChassisTheme t);
     void syncFromAPVTS();
-    void setGainReductionDb(float grDb) noexcept;
+    void setGainReductionDb(float grDb, float inputPeakDb = -60.0f) noexcept;
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -56,12 +49,14 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> inAtt_;
     std::unique_ptr<KalyxArrowSelector> routingSelector_;
 
-    // 2 gros potentiomètres principaux (GAIN, PEAK REDUCTION) + 3 petits secondaires (R37 EMPHASIS, CELL AGE, BLEND)
+    InteractiveTransferCurve transferCurve_;
+
+    // 2 gros potentiomètres principaux (GAIN, PEAK REDUCTION) + 3 barres TactileFaderBar
     KalyxRotaryControl gainKnob_;
     KalyxRotaryControl peakRedKnob_;
-    KalyxRotaryControl r37EmphKnob_;
-    KalyxRotaryControl cellAgeKnob_;
-    KalyxRotaryControl blendKnob_;
+    TactileFaderBar    r37EmphBar_;
+    TactileFaderBar    cellAgeBar_;
+    TactileFaderBar    blendBar_;
 
     // Zones calculées dans resized() pour le rendu vectoriel & les clics
     juce::Rectangle<float> pilotLampRect_;

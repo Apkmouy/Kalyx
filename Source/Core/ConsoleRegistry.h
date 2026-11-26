@@ -20,40 +20,40 @@ public:
     {
         static constexpr std::array<SlotModuleDescriptor, static_cast<std::size_t>(SlotModuleId::Count)> kModules {{
             // Color & Preamp
-            { SlotModuleId::SSL4000Preamp,      "SSL 4000 Pre",    "SSL 4000 Preamp",              "Color & Preamp", 0xff181b22u, 0xff9e2a3bu, false },
-            { SlotModuleId::API2520Preamp,      "API 2520 Pre",    "API 2520 Preamp",              "Color & Preamp", 0xff181b22u, 0xff1e64b4u, false },
-            { SlotModuleId::Neve1073Preamp,     "Neve 1073 Pre",   "Neve 1073 Marinair",           "Color & Preamp", 0xff181b22u, 0xffa62c3bu, false },
-            { SlotModuleId::KalyxCleanPreamp,   "Kalyx Clean",     "Kalyx Clean Preamp",           "Color & Preamp", 0xff181b22u, 0xff2348b8u, false },
+            { SlotModuleId::SSL4000Preamp,      "British 4K Pre",    "British 4K Preamp",            "Color & Preamp", 0xff181b22u, 0xff9e2a3bu, false },
+            { SlotModuleId::API2520Preamp,      "American 25 Pre",   "American 25 Preamp",           "Color & Preamp", 0xff181b22u, 0xff1e64b4u, false },
+            { SlotModuleId::Neve1073Preamp,     "Class-A 73 Pre",    "Class-A 73 Preamp",            "Color & Preamp", 0xff181b22u, 0xffa62c3bu, false },
+            { SlotModuleId::KalyxCleanPreamp,   "Kalyx Clean",       "Kalyx Clean Preamp",           "Color & Preamp", 0xff181b22u, 0xff2348b8u, false },
 
             // Dynamics
-            { SlotModuleId::SSL4000Comp,        "SSL 4000 VCA",    "SSL 4000 VCA",                 "Dynamics",       0xff181b22u, 0xff9e2a3bu, false },
-            { SlotModuleId::API2500Comp,        "API 2500",        "API 2500",                     "Dynamics",       0xff181b22u, 0xff1e64b4u, false },
-            { SlotModuleId::Neve5254Comp,       "Neve 5254",       "Neve 5254",                    "Dynamics",       0xff181b22u, 0xffa62c3bu, false },
+            { SlotModuleId::SSL4000Comp,        "British 4K VCA",    "British 4K VCA",               "Dynamics",       0xff181b22u, 0xff9e2a3bu, false },
+            { SlotModuleId::API2500Comp,        "American 2500",     "American 2500 VCA",            "Dynamics",       0xff181b22u, 0xff1e64b4u, false },
+            { SlotModuleId::Neve5254Comp,       "Class-A 54",        "Class-A 54 Diode",             "Dynamics",       0xff181b22u, 0xffa62c3bu, false },
 
             // Equalizers
-            { SlotModuleId::SSL4000EQ,          "SSL 4000 EQ",     "SSL 4000 EQ",                  "Equalizers",     0xff181b22u, 0xff9e2a3bu, false },
-            { SlotModuleId::API550BEQ,          "API 550B EQ",     "API 550B EQ",                  "Equalizers",     0xff181b22u, 0xff1e64b4u, false },
-            { SlotModuleId::Neve1073EQ,         "Neve 1073 EQ",    "Neve 1073 EQ",                 "Equalizers",     0xff181b22u, 0xffa62c3bu, false },
+            { SlotModuleId::SSL4000EQ,          "British 4K EQ",     "British 4K EQ",                "Equalizers",     0xff181b22u, 0xff9e2a3bu, false },
+            { SlotModuleId::API550BEQ,          "American 550 EQ",   "American 550 EQ",              "Equalizers",     0xff181b22u, 0xff1e64b4u, false },
+            { SlotModuleId::Neve1073EQ,         "Class-A 73 EQ",     "Class-A 73 EQ",                "Equalizers",     0xff181b22u, 0xffa62c3bu, false },
 
-            // Color & Preamp (Color Stage)
-            { SlotModuleId::ConsoleColor,       "Color Stage",     "Color Stage",                  "Color & Preamp", 0xff181b22u, 0xff5b2344u, false },
+            // Color & Preamp (Analog Color)
+            { SlotModuleId::ConsoleColor,       "Analog Color",      "Analog Color",                 "Color & Preamp", 0xff181b22u, 0xff5b2344u, false },
 
             // Dynamics / Utility
-            { SlotModuleId::UtilityGateDeEsser, "Gate / De-Esser", "Gate / De-Esser",              "Utility",        0xff181b22u, 0xff2348b8u, false },
-            { SlotModuleId::PrecisionLimiter,   "Peak Limiter",    "Peak Limiter",                 "Dynamics",       0xff181b22u, 0xff5b2344u, false },
-            { SlotModuleId::EmptyBypass,        "Empty",           "Empty / Bypass",               "Utility",        0xff181b22u, 0xff262a35u, false },
+            { SlotModuleId::UtilityGateDeEsser, "Gate & De-Esser",   "Gate & De-Esser",              "Dynamics",       0xff181b22u, 0xff2348b8u, false },
+            { SlotModuleId::PrecisionLimiter,   "Brickwall Lim",     "Brickwall Limiter",            "Dynamics",       0xff181b22u, 0xff5b2344u, false },
+            { SlotModuleId::EmptyBypass,        "Empty",             "Empty / Bypass",               "Utility",        0xff181b22u, 0xff262a35u, false },
 
             // Dynamics (FET / Opto / VCA Hybride / Vari-Mu)
-            { SlotModuleId::UA1176Comp,         "UA 1176",         "UA 1176 (FET)",                "Dynamics",       0xff181b22u, 0xffd64545u, false },
-            { SlotModuleId::LA2AComp,           "Teletronix LA-2A","Teletronix LA-2A (Opto)",      "Dynamics",       0xff181b22u, 0xff7e96adu, false },
-            { SlotModuleId::DistressorComp,     "Distressor",      "Empirical Labs Distressor",    "Dynamics",       0xff181b22u, 0xffc93030u, false },
-            { SlotModuleId::FairchildComp,      "Fairchild 670",   "Fairchild 660/670 (Vari-Mu)",  "Dynamics",       0xff181b22u, 0xffc59b38u, false },
+            { SlotModuleId::UA1176Comp,         "FET-76 Comp",       "FET-76 Compressor",            "Dynamics",       0xff181b22u, 0xffd64545u, false },
+            { SlotModuleId::LA2AComp,           "Opto-2A Lev",       "Opto-2A Leveler",              "Dynamics",       0xff181b22u, 0xff7e96adu, false },
+            { SlotModuleId::DistressorComp,     "Stress-VCA",        "Stress-VCA",                   "Dynamics",       0xff181b22u, 0xffc93030u, false },
+            { SlotModuleId::FairchildComp,      "Vari-Mu 670",       "Vari-Mu 670",                  "Dynamics",       0xff181b22u, 0xffc59b38u, false },
 
             // Gamme Moderne Kalyx Audio (2U Double-Largeur & 1U)
-            { SlotModuleId::SurgicalEQ2U,       "SURGICAL EQ 2U",  "Kalyx Surgical EQ (2U)",            "Equalizers",     0xff181b22u, 0xff2348b8u, false },
-            { SlotModuleId::PrecisionDyn2U,     "PRECISION DYN 2U","Kalyx Precision VCA & Trans (2U)",  "Dynamics",       0xff181b22u, 0xff2348b8u, false },
-            { SlotModuleId::HarmonicSculptor,   "HARMONIC SCULPT", "Kalyx Harmonic Sculptor (1U)",      "Color & Preamp", 0xff181b22u, 0xff5b2344u, false },
-            { SlotModuleId::StereoPhase,        "STEREO STUDIO",   "Kalyx Stereo & Phase Studio (1U)",  "Utility",        0xff181b22u, 0xff2348b8u, false }
+            { SlotModuleId::SurgicalEQ2U,       "Spectral Split-EQ", "Spectral Split-EQ (2U)",       "Equalizers",     0xff181b22u, 0xff2348b8u, false },
+            { SlotModuleId::PrecisionDyn2U,     "Kinetic Dynamics",  "Kinetic Dynamics (2U)",        "Dynamics",       0xff181b22u, 0xff2348b8u, false },
+            { SlotModuleId::HarmonicSculptor,   "Harmonic Matrix",   "Harmonic Matrix (1U)",         "Color & Preamp", 0xff181b22u, 0xff5b2344u, false },
+            { SlotModuleId::StereoPhase,        "Spatial Vector",    "Spatial Vector (1U)",          "Utility",        0xff181b22u, 0xff2348b8u, false }
         }};
         return kModules;
     }

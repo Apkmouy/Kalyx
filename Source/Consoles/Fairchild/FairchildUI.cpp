@@ -83,15 +83,19 @@ FairchildUI::FairchildUI(KalyxHybridConsoleProcessor& proc, int slotIndex)
     outputKnob_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 5),
                      "OUTPUT", gold, capCol, darkTxt, defs[4], fmtDb,
                      "Output Stage Level (-24 to +24 dB)", parseDb24);
-    matchLrKnob_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 6),
-                      "MATCH L/R", copper, capCol, darkTxt, defs[5], fmtPct,
-                      "L/R Tube Matching (100% = matched, lower = organic 3D stereo drift)", parsePct);
-    matchPpKnob_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 7),
-                      "MATCH P/P", copper, capCol, darkTxt, defs[6], fmtPct,
-                      "Push-Pull Balance (100% = clean symmetry, lower = rich even-order harmonics)", parsePct);
-    blendKnob_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 8),
-                    "BLEND", gold, capCol, darkTxt, defs[7], fmtPct,
-                    "Parallel Dry/Wet Vari-Mu Blend (0 - 100 %)", parsePct);
+    transferCurve_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 3),
+                        -42.0f, -2.0f, defs[2], true, gold, darkTxt,
+                        "Dynamic Vari-Mu Transfer Curve (Drag to adjust AC Threshold, Double-Click to Reset)");
+
+    matchLrBar_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 6),
+                     "MATCH L/R", copper, false, darkTxt, defs[5], fmtPct,
+                     "L/R Tube Matching (100% = matched, lower = organic 3D stereo drift)", parsePct);
+    matchPpBar_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 7),
+                     "MATCH P/P", copper, false, darkTxt, defs[6], fmtPct,
+                     "Push-Pull Balance (100% = clean symmetry, lower = rich even-order harmonics)", parsePct);
+    blendBar_.init  (*this, apvts, ParamIDs::slotParamId(slotIndex_, 8),
+                     "BLEND", gold, false, darkTxt, defs[7], fmtPct,
+                     "Parallel Dry/Wet Vari-Mu Blend (0 - 100 %)", parsePct);
 
     tubeSelector_ = std::make_unique<KalyxArrowSelector>(
         apvts, ParamIDs::slotParamId(slotIndex_, 9), "NOS TUBE",
@@ -112,6 +116,7 @@ void FairchildUI::setUiScale(float s)
 {
     uiScale_ = std::clamp(s, 0.75f, 2.20f);
     inBtn_.getProperties().set("kalyxScale", uiScale_);
+    transferCurve_.setUiScale(uiScale_);
     if (vintagePill_)     vintagePill_->setUiScale(uiScale_);
     if (tubeSelector_)    tubeSelector_->setUiScale(uiScale_);
     if (routingSelector_) routingSelector_->setUiScale(uiScale_);
@@ -119,9 +124,9 @@ void FairchildUI::setUiScale(float s)
     threshKnob_.setUiScale(uiScale_);
     timeConstKnob_.setUiScale(uiScale_);
     outputKnob_.setUiScale(uiScale_);
-    matchLrKnob_.setUiScale(uiScale_);
-    matchPpKnob_.setUiScale(uiScale_);
-    blendKnob_.setUiScale(uiScale_);
+    matchLrBar_.setUiScale(uiScale_);
+    matchPpBar_.setUiScale(uiScale_);
+    blendBar_.setUiScale(uiScale_);
     resized();
     repaint();
 }
@@ -138,6 +143,7 @@ void FairchildUI::setChassisTheme(kalyx::core::ChassisTheme t)
     const auto copper  = KalyxTheme::fairchildCopper;
 
     inBtn_.getProperties().set("kalyxDarkText", darkTxt);
+    transferCurve_.setThemeColours(gold, darkTxt);
     if (vintagePill_)     vintagePill_->setThemeColours(gold, darkTxt);
     if (tubeSelector_)    tubeSelector_->setThemeColours(gold, darkTxt);
     if (routingSelector_) routingSelector_->setThemeColours(copper, darkTxt);
@@ -146,17 +152,17 @@ void FairchildUI::setChassisTheme(kalyx::core::ChassisTheme t)
     threshKnob_.setThemeColours(gold, capCol, darkTxt);
     timeConstKnob_.setThemeColours(copper, capCol, darkTxt);
     outputKnob_.setThemeColours(gold, capCol, darkTxt);
-    matchLrKnob_.setThemeColours(copper, capCol, darkTxt);
-    matchPpKnob_.setThemeColours(copper, capCol, darkTxt);
-    blendKnob_.setThemeColours(gold, capCol, darkTxt);
+    matchLrBar_.setThemeColours(copper, darkTxt);
+    matchPpBar_.setThemeColours(copper, darkTxt);
+    blendBar_.setThemeColours(gold, darkTxt);
 
     repaint();
 }
 
-void FairchildUI::setTelemetry(float grDb) noexcept
+void FairchildUI::setTelemetry(float grDb, float inputPeakDb) noexcept
 {
     smoothedGrDb_ = smoothedGrDb_ * 0.72f + grDb * 0.28f;
-    repaint();
+    transferCurve_.setTelemetry(inputPeakDb, smoothedGrDb_);
 }
 
 void FairchildUI::syncFromAPVTS()
@@ -177,12 +183,15 @@ void FairchildUI::syncFromAPVTS()
     threshKnob_.setDimmed(!moduleIn_);
     timeConstKnob_.setDimmed(!moduleIn_);
     outputKnob_.setDimmed(!moduleIn_);
-    matchLrKnob_.setDimmed(!moduleIn_);
-    matchPpKnob_.setDimmed(!moduleIn_);
-    blendKnob_.setDimmed(!moduleIn_);
+    matchLrBar_.setDimmedDisabled(!moduleIn_);
+    matchPpBar_.setDimmedDisabled(!moduleIn_);
+    blendBar_.setDimmedDisabled(!moduleIn_);
     if (vintagePill_)     vintagePill_->setAlpha(activeAlpha);
     if (tubeSelector_)    tubeSelector_->setAlpha(activeAlpha);
     if (routingSelector_) routingSelector_->setAlpha(activeAlpha);
+
+    transferCurve_.setCurveConfig(InteractiveTransferCurve::CurveType::VariMu,
+                                  4.0f, 14.0f, moduleIn_, vintageMode_);
 
     if (changed)
     {
@@ -255,10 +264,6 @@ void FairchildUI::paint(juce::Graphics& g)
     if (!sepTopRect_.isEmpty()) g.fillRect(sepTopRect_);
     if (!sepBotRect_.isEmpty()) g.fillRect(sepBotRect_);
 
-    // Bargraph GR Vari-Mu
-    if (!grStripRect_.isEmpty())
-        drawGrBargraph(g, grStripRect_);
-
     // Signature de la lampe NOS sélectionnée
     if (!tubeSigRect_.isEmpty())
     {
@@ -287,16 +292,16 @@ void FairchildUI::resized()
 
     r.removeFromTop(s);
 
-    // Bargraph GR
-    const int grH = std::max(16, static_cast<int>(18.0f * uiScale_));
-    grStripRect_ = r.removeFromTop(grH).toFloat();
+    // Courbe de transfert dynamique Vari-Mu
+    const int curveH = std::max(66, static_cast<int>(76.0f * uiScale_));
+    transferCurve_.setBounds(r.removeFromTop(curveH));
     r.removeFromTop(s);
     sepTopRect_ = r.removeFromTop(1).toFloat();
     r.removeFromTop(s);
 
     // Réserve bas : sélecteurs NOS TUBE + signature + ROUTING
-    const int selH = std::max(22, static_cast<int>(24.0f * uiScale_));
-    const int sigH = std::max(12, static_cast<int>(14.0f * uiScale_));
+    const int selH = std::max(22, static_cast<int>(22.0f * uiScale_));
+    const int sigH = std::max(12, static_cast<int>(13.0f * uiScale_));
     const int botTotal = selH * 2 + sigH + s * 3;
     auto botArea = r.removeFromBottom(std::min(botTotal, r.getHeight() / 3));
     sepBotRect_ = botArea.removeFromTop(1).toFloat();
@@ -309,11 +314,17 @@ void FairchildUI::resized()
     if (routingSelector_)
         routingSelector_->setBounds(botArea.removeFromTop(selH));
 
-    // Grille 2 rangées de potentiomètres dans l'espace central
-    const int rowGap = s;
-    const int topKnobH = static_cast<int>(r.getHeight() * 0.52f);
+    // 3 TactileFaderBar (MATCH L/R, MATCH P/P, BLEND) au-dessus du bas
+    const int faderH = std::max(18, static_cast<int>(20.0f * uiScale_));
+    auto faderArea = r.removeFromBottom(faderH * 3 + s * 3);
+    faderArea.removeFromTop(s);
+    matchLrBar_.setBounds(faderArea.removeFromTop(faderH)); faderArea.removeFromTop(s);
+    matchPpBar_.setBounds(faderArea.removeFromTop(faderH)); faderArea.removeFromTop(s);
+    blendBar_.setBounds  (faderArea.removeFromTop(faderH));
+
+    // Grille 2x2 de potentiomètres principaux dans l'espace central
+    const int topKnobH = r.getHeight() / 2;
     auto row1 = r.removeFromTop(topKnobH);
-    r.removeFromTop(rowGap);
     auto row2 = r;
 
     auto placeKnob = [](KalyxRotaryControl& k, juce::Rectangle<int> area, float maxD)
@@ -322,22 +333,11 @@ void FairchildUI::resized()
                          static_cast<float>(area.getWidth()), static_cast<float>(area.getHeight()), maxD);
     };
 
-    // Rangée 1 : INPUT GAIN, AC THRESH, TIME CONST (3 gros contrôles)
-    {
-        const int w = row1.getWidth() / 3;
-        placeKnob(inputKnob_,     row1.removeFromLeft(w), 68.0f);
-        placeKnob(threshKnob_,    row1.removeFromLeft(w), 68.0f);
-        placeKnob(timeConstKnob_, row1,                   60.0f);
-    }
-
-    // Rangée 2 : OUTPUT, MATCH L/R, MATCH P/P, BLEND (4 contrôles)
-    {
-        const int w = row2.getWidth() / 4;
-        placeKnob(outputKnob_,  row2.removeFromLeft(w), 54.0f);
-        placeKnob(matchLrKnob_, row2.removeFromLeft(w), 54.0f);
-        placeKnob(matchPpKnob_, row2.removeFromLeft(w), 54.0f);
-        placeKnob(blendKnob_,   row2,                   54.0f);
-    }
+    const int w2 = row1.getWidth() / 2;
+    placeKnob(inputKnob_,     row1.removeFromLeft(w2), 54.0f);
+    placeKnob(threshKnob_,    row1,                    54.0f);
+    placeKnob(timeConstKnob_, row2.removeFromLeft(w2), 50.0f);
+    placeKnob(outputKnob_,    row2,                    50.0f);
 }
 
 } // namespace kalyx::consoles

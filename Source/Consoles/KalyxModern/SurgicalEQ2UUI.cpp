@@ -407,15 +407,15 @@ void SurgicalEQ2UUI::paint(juce::Graphics& g)
             preFillPath.lineTo(graphRect_.getRight(), graphRect_.getBottom());
             preFillPath.closeSubPath();
 
-            const auto preFillCol = isDay ? juce::Colour(0xff5b6e8f).withAlpha(0.30f)
-                                          : juce::Colour(0xff3e5070).withAlpha(0.30f);
+            const auto preFillCol = isDay ? juce::Colour(0xff5b6e8f).withAlpha(0.25f)
+                                          : juce::Colour(0xff3e5070).withAlpha(0.25f);
             g.setColour(preFillCol);
             g.fillPath(preFillPath);
 
-            const auto postLineCol = isDay ? KalyxTheme::kalyxRoyalBlue.withAlpha(0.90f)
-                                           : juce::Colour(0xff5c8cff).withAlpha(0.90f);
+            const auto postLineCol = isDay ? KalyxTheme::kalyxRoyalBlue.withAlpha(0.92f)
+                                           : juce::Colour(0xff5c8cff).withAlpha(0.92f);
             g.setColour(postLineCol);
-            g.strokePath(postLinePath, juce::PathStrokeType(1.5f));
+            g.strokePath(postLinePath, juce::PathStrokeType(1.6f));
         }
 
         // Courbes Tonal (Bleu Roi #3B66E0) & Transient (Or #E0A82E)

@@ -13,13 +13,13 @@ StereoPhaseUI::StereoPhaseUI(KalyxHybridConsoleProcessor& proc, int slotIndex)
     auto& apvts = processor_.getAPVTS();
     const auto defs = ModuleRegistry::getDefaultParamsForModule(SlotModuleId::StereoPhase);
 
-    const auto royalBlue = KalyxTheme::kalyxRoyalBlue; // #2348B8
-    const auto aubergine = KalyxTheme::kalyxAubergine; // #5B2344
+    const auto royalBlue = KalyxTheme::kalyxRoyalBlue;
+    const auto aubergine = KalyxTheme::kalyxAubergine;
     const auto capCol    = KalyxTheme::nightControlIdleBg;
     constexpr bool darkTxt = false;
 
     setupKalyxToggle(*this, inBtn_, inAtt_, apvts, ParamIDs::slotParamId(slotIndex_, 1),
-                     "STEREO IN", royalBlue, darkTxt, "Engage or bypass Kalyx Stereo & Phase Studio");
+                     "SPATIAL IN", royalBlue, darkTxt, "Engage or bypass Kalyx Spatial Vector");
 
     modePill_ = std::make_unique<KalyxSegmentedPill>(
         apvts, ParamIDs::slotParamId(slotIndex_, 2), "",
@@ -66,10 +66,11 @@ StereoPhaseUI::StereoPhaseUI(KalyxHybridConsoleProcessor& proc, int slotIndex)
                     fmtDeg, "Continuous All-Pass Phase Rotation (-180 to +180 deg)", parseDeg);
     knobs_[3]->init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 6), "SIDE TILT", royalBlue, capCol, darkTxt, defs[5],
                     fmtTilt, "Side Channel Tilt EQ (-6 to +6 dB/oct)", KalyxValueParsers::parseLinDb(-6.0f, 6.0f));
-    knobs_[4]->init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 7), "MID GAIN", royalBlue, capCol, darkTxt, defs[6],
-                    fmtDb12, "Mid Channel Gain (-12 to +12 dB)", KalyxValueParsers::parseLinDb(-12.0f, 12.0f));
-    knobs_[5]->init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 8), "SIDE GAIN", royalBlue, capCol, darkTxt, defs[7],
-                    fmtDb12, "Side Channel Gain (-12 to +12 dB)", KalyxValueParsers::parseLinDb(-12.0f, 12.0f));
+
+    midGainBar_.init (*this, apvts, ParamIDs::slotParamId(slotIndex_, 7), "MID GAIN",  royalBlue, true, darkTxt, defs[6],
+                      fmtDb12, "Mid Channel Gain (-12 to +12 dB)", KalyxValueParsers::parseLinDb(-12.0f, 12.0f));
+    sideGainBar_.init(*this, apvts, ParamIDs::slotParamId(slotIndex_, 8), "SIDE GAIN", royalBlue, true, darkTxt, defs[7],
+                      fmtDb12, "Side Channel Gain (-12 to +12 dB)", KalyxValueParsers::parseLinDb(-12.0f, 12.0f));
 
     setupKalyxToggle(*this, invLBtn_, invLAtt_, apvts, ParamIDs::slotParamId(slotIndex_, 9),
                      juce::String::fromUTF8("\xC3\x98 L"), aubergine, darkTxt, "Invert Left Channel Polarity");
@@ -94,6 +95,8 @@ void StereoPhaseUI::setUiScale(float s)
     if (monitorPill_) monitorPill_->setUiScale(uiScale_);
     for (auto& k : knobs_)
         if (k) k->setUiScale(uiScale_);
+    midGainBar_.setUiScale(uiScale_);
+    sideGainBar_.setUiScale(uiScale_);
     resized();
     repaint();
 }
@@ -103,7 +106,9 @@ void StereoPhaseUI::setChassisTheme(kalyx::core::ChassisTheme t)
     theme_ = t;
     const bool isDay = (t == kalyx::core::ChassisTheme::Day);
     const auto capCol = isDay ? KalyxTheme::dayControlIdleBg : KalyxTheme::nightControlIdleBg;
-    for (int i = 0; i < 6; ++i)
+    midGainBar_.setThemeColours(KalyxTheme::kalyxRoyalBlue, isDay);
+    sideGainBar_.setThemeColours(KalyxTheme::kalyxRoyalBlue, isDay);
+    for (int i = 0; i < 4; ++i)
         if (knobs_[static_cast<std::size_t>(i)])
             knobs_[static_cast<std::size_t>(i)]->setThemeColours(
                 (i == 2) ? KalyxTheme::kalyxAubergine : KalyxTheme::kalyxRoyalBlue, capCol, isDay);
@@ -119,6 +124,8 @@ void StereoPhaseUI::updateDependentStates()
     invLBtn_.setEnabled(modOn);
     invRBtn_.setEnabled(modOn);
     swapBtn_.setEnabled(modOn);
+    midGainBar_.setDimmedDisabled(!modOn);
+    sideGainBar_.setDimmedDisabled(!modOn);
     for (auto& k : knobs_)
         if (k) k->setDimmedDisabled(!modOn);
 }
@@ -164,19 +171,16 @@ void StereoPhaseUI::paint(juce::Graphics& g)
     g.setColour(isDay ? juce::Colour(0xffcbd2df) : juce::Colour(0xff232834));
     g.fillRoundedRectangle(barX, barY, barW, barH, 3.0f * sc);
 
-    // Ligne centrale (0)
     const float midX = barX + barW * 0.5f;
     g.setColour(isDay ? juce::Colour(0xff8c96a8) : juce::Colour(0xff4a5266));
     g.drawVerticalLine(static_cast<int>(midX), barY - 2.0f * sc, barY + barH + 2.0f * sc);
 
-    // Curseur temps réel (-1 .. +1)
     const float norm = std::clamp((correlation_ + 1.0f) * 0.5f, 0.0f, 1.0f);
     const float dotX = barX + norm * barW;
     const auto dotCol = (correlation_ < -0.15f) ? KalyxTheme::distressorRed
                       : (correlation_ < 0.25f)  ? KalyxTheme::amberLed
                                                 : KalyxTheme::kalyxRoyalBlue;
 
-    // Remplissage depuis le centre
     const float fillX = std::min(midX, dotX);
     const float fillW = std::abs(dotX - midX);
     g.setColour(dotCol.withAlpha(0.75f));
@@ -188,7 +192,7 @@ void StereoPhaseUI::paint(juce::Graphics& g)
 
 void StereoPhaseUI::resized()
 {
-    const auto b = getLocalBounds().toFloat().reduced(4.0f * uiScale_, 2.0f * uiScale_);
+    const auto b = getLocalBounds().toFloat().reduced(5.0f * uiScale_, 3.0f * uiScale_);
     if (b.isEmpty()) return;
 
     const float hdrH = 22.0f * uiScale_;
@@ -202,10 +206,16 @@ void StereoPhaseUI::resized()
     const float corrH = 18.0f * uiScale_;
     corrRect_ = { b.getX(), b.getY() + hdrH + 3.0f * uiScale_, b.getWidth(), corrH };
 
-    const float monH = 22.0f * uiScale_;
-    const float phH  = 22.0f * uiScale_;
-    const float monY = b.getBottom() - monH;
-    const float phY  = monY - phH - 4.0f * uiScale_;
+    const float monH   = 22.0f * uiScale_;
+    const float phH    = 22.0f * uiScale_;
+    const float faderH = 22.0f * uiScale_;
+    const float monY   = b.getBottom() - monH;
+    const float phY    = monY - phH - 4.0f * uiScale_;
+    const float sideY  = phY - faderH - 4.0f * uiScale_;
+    const float midY   = sideY - faderH - 4.0f * uiScale_;
+
+    midGainBar_.setBounds (static_cast<int>(b.getX()), static_cast<int>(midY),  static_cast<int>(b.getWidth()), static_cast<int>(faderH));
+    sideGainBar_.setBounds(static_cast<int>(b.getX()), static_cast<int>(sideY), static_cast<int>(b.getWidth()), static_cast<int>(faderH));
 
     if (monitorPill_)
         monitorPill_->setBounds(static_cast<int>(b.getX()), static_cast<int>(monY),
@@ -217,11 +227,11 @@ void StereoPhaseUI::resized()
     swapBtn_.setBounds(static_cast<int>(b.getX() + 2.0f * (btnW + 4.0f * uiScale_)), static_cast<int>(phY), static_cast<int>(btnW), static_cast<int>(phH));
 
     const float gridTop = corrRect_.getBottom() + 4.0f * uiScale_;
-    const float gridH   = std::max(40.0f, phY - 4.0f * uiScale_ - gridTop);
-    const float rowH    = gridH / 3.0f;
+    const float gridH   = std::max(50.0f, midY - 4.0f * uiScale_ - gridTop);
+    const float rowH    = gridH * 0.5f;
     const float colW    = b.getWidth() * 0.5f;
 
-    for (int r = 0; r < 3; ++r)
+    for (int r = 0; r < 2; ++r)
     {
         for (int c = 0; c < 2; ++c)
         {
@@ -230,7 +240,7 @@ void StereoPhaseUI::resized()
                 knobs_[static_cast<std::size_t>(idx)]->setBoundsTight(
                     b.getX() + static_cast<float>(c) * colW,
                     gridTop + static_cast<float>(r) * rowH,
-                    colW, rowH);
+                    colW, rowH, 48.0f);
         }
     }
 }

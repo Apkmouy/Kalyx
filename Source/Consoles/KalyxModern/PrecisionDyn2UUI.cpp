@@ -13,14 +13,14 @@ PrecisionDyn2UUI::PrecisionDyn2UUI(KalyxHybridConsoleProcessor& proc, int hostSl
     auto& apvts = processor_.getAPVTS();
     const auto defs = ModuleRegistry::getDefaultParams2UForModule(SlotModuleId::PrecisionDyn2U);
 
-    const auto royalBlue = KalyxTheme::kalyxRoyalBlue;  // #2348B8
-    const auto aubergine = KalyxTheme::kalyxAubergine;  // #5B2344
+    const auto royalBlue = KalyxTheme::kalyxRoyalBlue;
+    const auto aubergine = KalyxTheme::kalyxAubergine;
     const auto capCol    = KalyxTheme::nightControlIdleBg;
     constexpr bool darkTxt = false;
 
     setupKalyxToggle(*this, inBtn_, inAtt_, apvts, get2UParamId(0),
-                     "PRECISION DYN 2U", royalBlue, darkTxt,
-                     "Engage or bypass Kalyx Precision VCA & Transient 2U");
+                     "KINETIC DYN 2U", royalBlue, darkTxt,
+                     "Engage or bypass Kalyx Kinetic Dynamics 2U");
 
     setupKalyxToggle(*this, autoRelBtn_, autoRelAtt_, apvts, get2UParamId(3),
                      "AUTO REL", aubergine, darkTxt,
@@ -33,15 +33,13 @@ PrecisionDyn2UUI::PrecisionDyn2UUI(KalyxHybridConsoleProcessor& proc, int hostSl
         "Transient Shaper placement: before or after VCA compression");
     addAndMakeVisible(*orderPill_);
 
-    lookaheadKnob_ = std::make_unique<KalyxRotaryControl>();
-    lookaheadKnob_->init(*this, apvts, get2UParamId(2), "LOOKAHEAD", royalBlue, capCol, darkTxt, defs[2],
+    lookaheadBar_.init(*this, apvts, get2UParamId(2), "LOOK", royalBlue, false, darkTxt, defs[2],
         [](double v) { return juce::String(static_cast<float>(v) * 5.0f, 1) + " ms"; },
         "Lookahead (0.0 to 5.0 ms) for distortion-free transient limiting",
         [](const juce::String& text) -> double
         {
             juce::String suf;
-            const double ms = std::clamp(KalyxValueParsers::parseCleanNumber(text, suf), 0.0, 5.0);
-            return ms / 5.0;
+            return std::clamp(KalyxValueParsers::parseCleanNumber(text, suf), 0.0, 5.0) / 5.0;
         });
 
     auto fmtDb = [](float minD, float maxD)
@@ -108,10 +106,15 @@ PrecisionDyn2UUI::PrecisionDyn2UUI(KalyxHybridConsoleProcessor& proc, int hostSl
         return juce::String(juce::roundToInt(std::clamp(static_cast<float>(v), 0.0f, 1.0f) * 100.0f)) + " %";
     };
 
+    punchSustainPad_.init(*this, apvts, get2UParamId(10), get2UParamId(11),
+                          "PUNCH", "SUST", defs[10], defs[11], true, aubergine, darkTxt,
+                          fmtSignedPct, fmtSignedPct,
+                          "2D Transient Shaper: PUNCH (X) x SUSTAIN (Y) | Double-Click to Reset (0%)");
+
     for (auto& k : knobs_)
         k = std::make_unique<KalyxRotaryControl>();
 
-    // Rangée 1 (VCA) : THRESH, RATIO, KNEE, ATTACK, RELEASE, MAKEUP
+    // VCA : THRESH(0), RATIO(1), KNEE(2), ATTACK(3), RELEASE(4), MAKEUP(5)
     knobs_[0]->init(*this, apvts, get2UParamId(4), "THRESH", royalBlue, capCol, darkTxt, defs[4],
                     fmtDb(-50.0f, 0.0f), "VCA Threshold (-50 to 0 dB)", KalyxValueParsers::parseLinDb(-50.0f, 0.0f));
     knobs_[1]->init(*this, apvts, get2UParamId(5), "RATIO", royalBlue, capCol, darkTxt, defs[5],
@@ -125,17 +128,13 @@ PrecisionDyn2UUI::PrecisionDyn2UUI(KalyxHybridConsoleProcessor& proc, int hostSl
     knobs_[5]->init(*this, apvts, get2UParamId(9), "MAKEUP", royalBlue, capCol, darkTxt, defs[9],
                     fmtDb(-12.0f, 24.0f), "Output Makeup Gain (-12 to +24 dB)", KalyxValueParsers::parseLinDb(-12.0f, 24.0f));
 
-    // Rangée 2 (Transient & Routing) : PUNCH, SUSTAIN, TRANS FRQ, SC HPF, BLEND
-    knobs_[6]->init(*this, apvts, get2UParamId(10), "PUNCH", aubergine, capCol, darkTxt, defs[10],
-                    fmtSignedPct, "Transient Attack Shaper (-100% to +100%)", KalyxValueParsers::parseLinPct(-100.0f, 100.0f));
-    knobs_[7]->init(*this, apvts, get2UParamId(11), "SUSTAIN", aubergine, capCol, darkTxt, defs[11],
-                    fmtSignedPct, "Transient Sustain / Room Tail (-100% to +100%)", KalyxValueParsers::parseLinPct(-100.0f, 100.0f));
-    knobs_[8]->init(*this, apvts, get2UParamId(12), "TRANS FRQ", aubergine, capCol, darkTxt, defs[12],
+    // Filtres & Mix : TRANS FRQ(6), SC HPF(7), BLEND(8)
+    knobs_[6]->init(*this, apvts, get2UParamId(12), "TRANS FRQ", aubergine, capCol, darkTxt, defs[12],
                     fmtHz(100.0f, 8000.0f), "Dual-Band Transient Crossover (100 Hz to 8 kHz)", KalyxValueParsers::parseHzLog(100.0f, 8000.0f));
-    knobs_[9]->init(*this, apvts, get2UParamId(13), "SC HPF", royalBlue, capCol, darkTxt, defs[13],
+    knobs_[7]->init(*this, apvts, get2UParamId(13), "SC HPF", royalBlue, capCol, darkTxt, defs[13],
                     fmtHz(20.0f, 500.0f), "Sidechain High-Pass Filter (20 to 500 Hz)", KalyxValueParsers::parseHzLog(20.0f, 500.0f));
-    knobs_[10]->init(*this, apvts, get2UParamId(14), "BLEND", royalBlue, capCol, darkTxt, defs[14],
-                     fmtPct, "Dry / Wet Parallel Mix (0% to 100%)", KalyxValueParsers::parseLinPct(0.0f, 100.0f));
+    knobs_[8]->init(*this, apvts, get2UParamId(14), "BLEND", royalBlue, capCol, darkTxt, defs[14],
+                    fmtPct, "Dry / Wet Parallel Mix (0% to 100%)", KalyxValueParsers::parseLinPct(0.0f, 100.0f));
 
     routingSelector_ = std::make_unique<KalyxArrowSelector>(
         apvts, get2UParamId(15), "ROUTING",
@@ -157,7 +156,8 @@ void PrecisionDyn2UUI::setUiScale(float s)
 {
     uiScale_ = std::clamp(s, 0.75f, 2.20f);
     if (orderPill_)       orderPill_->setUiScale(uiScale_);
-    if (lookaheadKnob_)   lookaheadKnob_->setUiScale(uiScale_);
+    lookaheadBar_.setUiScale(uiScale_);
+    punchSustainPad_.setUiScale(uiScale_);
     if (routingSelector_) routingSelector_->setUiScale(uiScale_);
     for (auto& k : knobs_)
         if (k) k->setUiScale(uiScale_);
@@ -170,11 +170,12 @@ void PrecisionDyn2UUI::setChassisTheme(kalyx::core::ChassisTheme t)
     theme_ = t;
     const bool isDay = (t == kalyx::core::ChassisTheme::Day);
     const auto capCol = isDay ? KalyxTheme::dayControlIdleBg : KalyxTheme::nightControlIdleBg;
-    if (lookaheadKnob_)   lookaheadKnob_->setThemeColours(KalyxTheme::kalyxRoyalBlue, capCol, isDay);
+    lookaheadBar_.setThemeColours(KalyxTheme::kalyxRoyalBlue, isDay);
+    punchSustainPad_.setThemeColours(KalyxTheme::kalyxAubergine, isDay);
     if (routingSelector_) routingSelector_->setThemeColours(KalyxTheme::kalyxRoyalBlue, isDay);
-    for (int i = 0; i < 11; ++i)
+    for (int i = 0; i < 9; ++i)
     {
-        const auto accent = (i >= 6 && i <= 8) ? KalyxTheme::kalyxAubergine : KalyxTheme::kalyxRoyalBlue;
+        const auto accent = (i == 6) ? KalyxTheme::kalyxAubergine : KalyxTheme::kalyxRoyalBlue;
         if (knobs_[static_cast<std::size_t>(i)])
             knobs_[static_cast<std::size_t>(i)]->setThemeColours(accent, capCol, isDay);
     }
@@ -188,14 +189,15 @@ void PrecisionDyn2UUI::updateDependentStates()
     const bool autoRel = (p[3] > 0.5f);
 
     if (orderPill_)       orderPill_->setEnabled(modOn);
-    if (lookaheadKnob_)   lookaheadKnob_->setDimmedDisabled(!modOn);
+    lookaheadBar_.setDimmedDisabled(!modOn);
+    punchSustainPad_.setDimmedDisabled(!modOn);
     if (routingSelector_) routingSelector_->setEnabled(modOn);
     autoRelBtn_.setEnabled(modOn);
 
-    for (int i = 0; i < 11; ++i)
+    for (int i = 0; i < 9; ++i)
     {
         bool dim = !modOn;
-        if (i == 4 && autoRel) dim = true; // RELEASE grisé lorsque AUTO REL est actif
+        if (i == 4 && autoRel) dim = true;
         if (knobs_[static_cast<std::size_t>(i)])
             knobs_[static_cast<std::size_t>(i)]->setDimmedDisabled(dim);
     }
@@ -220,7 +222,6 @@ void PrecisionDyn2UUI::paint(juce::Graphics& g)
     const bool isDay = (theme_ == kalyx::core::ChassisTheme::Day);
     const auto sc = uiScale_;
 
-    // Fond Tactile Flat de l'oscilloscope temps réel
     if (!scopeRect_.isEmpty())
     {
         const auto scopeBg     = isDay ? juce::Colour(0xffe8ebf2) : juce::Colour(0xff10131a);
@@ -245,10 +246,10 @@ void PrecisionDyn2UUI::paint(juce::Graphics& g)
             g.drawVerticalLine(static_cast<int>(gx), y0, y0 + h);
         }
 
-        // Grille horizontale dB (0 dB, -3 dB, -6 dB, -12 dB sur plage 0..24 dB)
+        // Grille horizontale dB (0 dB, -3 dB, -6 dB, -12 dB)
         static constexpr float kDbLines[4] = { 0.0f, 3.0f, 6.0f, 12.0f };
         static constexpr const char* kDbLabels[4] = { "0", "-3", "-6", "-12 dB" };
-        g.setFont(juce::Font(juce::FontOptions(8.5f * sc, juce::Font::plain)));
+        g.setFont(KalyxTheme::makeMonoFont(8.5f * sc, juce::Font::plain));
         for (int i = 0; i < 4; ++i)
         {
             const float gy = y0 + (kDbLines[i] / 24.0f) * (h * 0.90f);
@@ -260,7 +261,6 @@ void PrecisionDyn2UUI::paint(juce::Graphics& g)
         }
 
         const float midY = y0 + h * 0.56f;
-
         juce::Path wavePath, grPath, transPath;
         constexpr int N = PrecisionDyn2UDSP::kScopeSize;
 
@@ -300,7 +300,6 @@ void PrecisionDyn2UUI::paint(juce::Graphics& g)
         g.setColour(KalyxTheme::kalyxRoyalBlue);
         g.strokePath(grPath, juce::PathStrokeType(2.0f * sc));
 
-        // Légende discrète
         g.setFont(juce::Font(juce::FontOptions(9.0f * sc, juce::Font::bold)));
         g.setColour(KalyxTheme::kalyxRoyalBlue);
         g.drawText("GR", static_cast<int>(x0 + 4.0f), static_cast<int>(y0 + 2.0f), 24, 12, juce::Justification::left);
@@ -314,31 +313,36 @@ void PrecisionDyn2UUI::resized()
     const auto b = getLocalBounds().toFloat().reduced(6.0f * uiScale_, 4.0f * uiScale_);
     if (b.isEmpty()) return;
 
-    // En-tête compacte sans bouton rotatif : [IN] [PRE-TRANS | POST-TRANS] [AUTO REL]
+    // En-tête propre : [KINETIC DYN 2U] [PRE-TRANS | POST-TRANS] [LOOKAHEAD Bar] [AUTO REL]
     const float hdrH = 24.0f * uiScale_;
     headerRect_ = b.withHeight(hdrH);
 
     float hx = headerRect_.getX();
-    const float wIn = 132.0f * uiScale_;
+    const float wIn = 114.0f * uiScale_;
     inBtn_.setBounds(static_cast<int>(hx), static_cast<int>(headerRect_.getY() + 1.0f * uiScale_),
                      static_cast<int>(wIn), static_cast<int>(hdrH - 2.0f * uiScale_));
-    hx += wIn + 8.0f * uiScale_;
+    hx += wIn + 6.0f * uiScale_;
 
-    const float wPill = 148.0f * uiScale_;
+    const float wPill = 136.0f * uiScale_;
     if (orderPill_)
         orderPill_->setBounds(static_cast<int>(hx), static_cast<int>(headerRect_.getY() + 1.0f * uiScale_),
                               static_cast<int>(wPill), static_cast<int>(hdrH - 2.0f * uiScale_));
+    hx += wPill + 6.0f * uiScale_;
 
-    const float wAuto = 76.0f * uiScale_;
+    const float wAuto = 68.0f * uiScale_;
     autoRelBtn_.setBounds(static_cast<int>(headerRect_.getRight() - wAuto),
                           static_cast<int>(headerRect_.getY() + 1.0f * uiScale_),
                           static_cast<int>(wAuto), static_cast<int>(hdrH - 2.0f * uiScale_));
+
+    const float lookW = std::max(60.0f * uiScale_, headerRect_.getRight() - wAuto - 6.0f * uiScale_ - hx);
+    lookaheadBar_.setBounds(static_cast<int>(hx), static_cast<int>(headerRect_.getY() + 1.0f * uiScale_),
+                            static_cast<int>(lookW), static_cast<int>(hdrH - 2.0f * uiScale_));
 
     const float bodyTop = headerRect_.getBottom() + 6.0f * uiScale_;
     const float footH   = 22.0f * uiScale_;
     const float availH  = std::max(100.0f, b.getBottom() - bodyTop - footH - 8.0f * uiScale_);
 
-    // Zone 1 : Viewer / Oscilloscope (~55% de la hauteur utile)
+    // Zone 1 : Oscilloscope gradué (~55%)
     const float scH = std::max(84.0f * uiScale_, availH * 0.55f);
     scopeRect_ = { b.getX(), bodyTop, b.getWidth(), scH };
 
@@ -351,37 +355,30 @@ void PrecisionDyn2UUI::resized()
                                     static_cast<int>(footH));
     }
 
-    // Zone 2 : 12 contrôles sur 2 rangées de 6, diamètre borné à 45.0f * uiScale
+    // Zone 2 : Pad 2D PUNCH x SUSTAIN à gauche + 9 contrôles rotatifs contraints (<= 45.0f * uiScale)
     const float gridTop = scopeRect_.getBottom() + 6.0f * uiScale_;
     const float gridH   = std::max(60.0f, (b.getBottom() - footH - 4.0f * uiScale_) - gridTop);
-    const float rowH    = gridH * 0.5f;
-    const float colW    = b.getWidth() / 6.0f;
 
-    // Rangée 1 : THRESH(0), RATIO(1), KNEE(2), ATTACK(3), RELEASE(4), MAKEUP(5)
-    for (int c = 0; c < 6; ++c)
-    {
-        const float x = b.getX() + static_cast<float>(c) * colW;
+    const float padW = std::clamp(b.getWidth() * 0.24f, 88.0f * uiScale_, 132.0f * uiScale_);
+    punchSustainPad_.setBounds(static_cast<int>(b.getX()), static_cast<int>(gridTop + 2.0f * uiScale_),
+                               static_cast<int>(padW), static_cast<int>(gridH - 4.0f * uiScale_));
+
+    const float knobsX = b.getX() + padW + 6.0f * uiScale_;
+    const float knobsW = std::max(100.0f, b.getRight() - knobsX);
+    const float rowH   = gridH * 0.5f;
+    const float colW   = knobsW / 5.0f;
+
+    // Rangée 1 (5) : THRESH(0), RATIO(1), KNEE(2), ATTACK(3), RELEASE(4)
+    for (int c = 0; c < 5; ++c)
         if (knobs_[static_cast<std::size_t>(c)])
-            knobs_[static_cast<std::size_t>(c)]->setBoundsTight(x, gridTop, colW, rowH, 45.0f);
-    }
+            knobs_[static_cast<std::size_t>(c)]->setBoundsTight(knobsX + static_cast<float>(c) * colW, gridTop, colW, rowH, 45.0f);
 
-    // Rangée 2 : PUNCH(6), SUSTAIN(7), TRANS FRQ(8), SC HPF(9), LOOKAHEAD, BLEND(10)
+    // Rangée 2 (4) : MAKEUP(5), TRANS FRQ(6), SC HPF(7), BLEND(8) centrés sur 4 colonnes
+    const float colW4 = knobsW / 4.0f;
     const float y2 = gridTop + rowH;
-    const int row2KnobIndices[6] = { 6, 7, 8, 9, -1, 10 };
-    for (int c = 0; c < 6; ++c)
-    {
-        const float x = b.getX() + static_cast<float>(c) * colW;
-        const int kIdx = row2KnobIndices[c];
-        if (kIdx >= 0)
-        {
-            if (knobs_[static_cast<std::size_t>(kIdx)])
-                knobs_[static_cast<std::size_t>(kIdx)]->setBoundsTight(x, y2, colW, rowH, 45.0f);
-        }
-        else if (lookaheadKnob_)
-        {
-            lookaheadKnob_->setBoundsTight(x, y2, colW, rowH, 45.0f);
-        }
-    }
+    for (int c = 0; c < 4; ++c)
+        if (knobs_[static_cast<std::size_t>(5 + c)])
+            knobs_[static_cast<std::size_t>(5 + c)]->setBoundsTight(knobsX + static_cast<float>(c) * colW4, y2, colW4, rowH, 45.0f);
 }
 
 } // namespace kalyx::consoles

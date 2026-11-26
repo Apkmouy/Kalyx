@@ -207,7 +207,7 @@ namespace KalyxValueParsers
 
     [[nodiscard]] inline juce::String formatDbClean(double db)
     {
-        if (std::abs(db) < 0.05) db = 0.0;
+        if (std::abs(db) < 0.05) return "0.0 dB";
         return (db >= 0.05 ? "+" : "") + juce::String(db, 1) + " dB";
     }
 

@@ -4,6 +4,7 @@
 #include "../../Core/ConsoleModuleBase.h"
 #include "../../PluginProcessor.h"
 #include "../../UI/KalyxLookAndFeel.h"
+#include "../../UI/DataWidgets.h"
 #include "DistressorDSP.h"
 #include <array>
 #include <memory>
@@ -12,9 +13,7 @@ namespace kalyx::consoles
 {
 
 /**
- * Façade « Tactile Flat » de l'Empirical Labs Distressor (VCA + Distorsion Harmonique).
- * Fond unifié #181B22 avec accents Rouge Signal (#C93030) et Jaune Ambre (#E0A82E).
- * Toutes les dimensions et polices sont indexées sur uiScale.
+ * Façade « Data-Driven » de Stress-VCA (ex-Distressor).
  */
 class DistressorUI final : public juce::Component
 {
@@ -25,7 +24,7 @@ public:
     void setUiScale(float s);
     void setChassisTheme(kalyx::core::ChassisTheme t);
     void syncFromAPVTS();
-    void setTelemetry(float grDb, float thdPct) noexcept;
+    void setTelemetry(float grDb, float thdPct, float inputPeakDb = -60.0f) noexcept;
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -46,19 +45,21 @@ private:
     float smoothedGrDb_ { 0.0f };
     float smoothedThd_  { 0.0f };
 
-    // Ligne du haut : [● DIST IN]  [ BRITISH ]  [NUKE]
+    // Ligne du haut : [● STRESS IN]  [ BRITISH ]  [NUKE]
     juce::ToggleButton inBtn_;
     juce::ToggleButton britishBtn_;
     juce::TextButton   nukeBtn_ { "NUKE" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> inAtt_;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> britishAtt_;
 
-    // 5 potentiomètres : INPUT, OUTPUT, ATTACK, RELEASE, BLEND
+    InteractiveTransferCurve transferCurve_;
+
+    // 4 potentiomètres principaux (INPUT, OUTPUT, ATTACK, RELEASE) + BLEND en TactileFaderBar
     KalyxRotaryControl inputKnob_;
     KalyxRotaryControl outputKnob_;
     KalyxRotaryControl attackKnob_;
     KalyxRotaryControl releaseKnob_;
-    KalyxRotaryControl blendKnob_;
+    TactileFaderBar    blendBar_;
 
     // Bas : RATIO, DIST, FILTER, ROUTING
     std::unique_ptr<KalyxArrowSelector>   ratioSelector_;

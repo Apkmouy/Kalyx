@@ -4,6 +4,7 @@
 #include "../../Core/ConsoleModuleBase.h"
 #include "../../PluginProcessor.h"
 #include "../../UI/KalyxLookAndFeel.h"
+#include "../../UI/DataWidgets.h"
 #include "UA1176DSP.h"
 #include <array>
 #include <memory>
@@ -12,15 +13,7 @@ namespace kalyx::consoles
 {
 
 /**
- * Façade matérielle Série 500 authentique du compresseur Universal Audio 1176 (FET).
- * Rendu 100 % vectoriel juce::Graphics :
- * - Esthétique dynamique selon REVISION :
- *     * Rev A (Bluestripe) : aluminium brossé clair + bande verticale bleue derrière INPUT/OUTPUT
- *     * Rev D (Blackface)  : noir anodisé mat (#181A1F) + sérigraphie blanche
- *     * Rev G (Silverface) : aluminium argent satiné (#B8BEC6) + lettrage noir
- * - INPUT et OUTPUT plus larges que ATTACK/RELEASE et FET BIAS/BLEND
- * - 4 poussoirs de Ratio [4:1] [8:1] [12] [20] s'allumant tous simultanément quand ALL (SLAM) est actif
- * - Conventions du châssis (Double-clic = Reset, Shift/Ctrl + Glisser = Réglage fin, zéro troncature à 80 %).
+ * Façade matérielle Série 500 Data-Driven du compresseur FET-76 (ex-UA 1176).
  */
 class UA1176UI final : public juce::Component
 {
@@ -31,7 +24,7 @@ public:
     void setUiScale(float s);
     void setChassisTheme(kalyx::core::ChassisTheme t);
     void syncFromAPVTS();
-    void setGainReductionDb(float grDb) noexcept;
+    void setGainReductionDb(float grDb, float inputPeakDb = -60.0f) noexcept;
 
     [[nodiscard]] juce::Colour getCurrentAccentColour() const noexcept;
     [[nodiscard]] int getCurrentRevision() const noexcept { return currentRev_; }
@@ -63,13 +56,16 @@ private:
     std::unique_ptr<KalyxArrowSelector> revSelector_;
     std::unique_ptr<KalyxArrowSelector> routingSelector_;
 
-    // 6 potentiomètres rotatifs (INPUT, OUTPUT, ATTACK, RELEASE, FET BIAS, BLEND)
+    // Courbe de transfert interactive en haut
+    InteractiveTransferCurve transferCurve_;
+
+    // 4 potentiomètres principaux (INPUT, OUTPUT, ATTACK, RELEASE) + 2 barres TactileFaderBar (FET BIAS, BLEND)
     KalyxRotaryControl inputKnob_;
     KalyxRotaryControl outputKnob_;
     KalyxRotaryControl attackKnob_;
     KalyxRotaryControl releaseKnob_;
-    KalyxRotaryControl fetBiasKnob_;
-    KalyxRotaryControl blendKnob_;
+    TactileFaderBar    fetBiasBar_;
+    TactileFaderBar    blendBar_;
 
     // Boutons MODS : ALL (SLAM) & SLOW
     juce::ToggleButton slamBtn_;
