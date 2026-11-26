@@ -1,4 +1,4 @@
-name: Build & Validate Kalyx Hybrid Console (Linux & Windows - VST3, LV2, CLAP, Standalone)
+name: Build & Validate Kalyx Suite (Hybrid Console & Bass Rig - Linux & Windows)
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   dsp-prototype-validation:
-    name: Validate 64-Bit DSP Prototype (Python NumPy/SciPy)
+    name: Validate 64-Bit DSP Prototypes (Python NumPy/SciPy)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -23,8 +23,11 @@ jobs:
       - name: Install NumPy & SciPy
         run: pip install numpy scipy
 
-      - name: Run DSP Prototype & Zero-Input Silence Suite (< -120 dBFS)
+      - name: Run Kalyx Hybrid Console DSP Prototype
         run: python3 scripts/dsp_prototype.py
+
+      - name: Run Kalyx Bass Rig DSP Prototype (< -120 dBFS)
+        run: python3 KalyxBassRig/scripts/dsp_prototype.py
 
   build-linux:
     name: Build Linux (VST3, LV2, CLAP, Standalone)
@@ -52,13 +55,17 @@ jobs:
             libxcursor-dev \
             libcurl4-openssl-dev
 
-      - name: Configure CMake (Release)
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Configure & Build KalyxHybridConsole (Release)
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release -j $(nproc)
 
-      - name: Build All Plugin Targets
-        run: cmake --build build --config Release -j $(nproc)
+      - name: Configure & Build KalyxBassRig (Release)
+        run: |
+          cmake -S KalyxBassRig -B KalyxBassRig/build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build KalyxBassRig/build --config Release -j $(nproc)
 
-      - name: Upload Linux Plugin Artifacts
+      - name: Upload KalyxHybridConsole Linux Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: KalyxHybridConsole-Linux-x64
@@ -68,6 +75,16 @@ jobs:
             build/KalyxHybridConsole_artefacts/Release/CLAP/**
             build/KalyxHybridConsole_artefacts/Release/Standalone/**
 
+      - name: Upload KalyxBassRig Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: KalyxBassRig-Linux-x64
+          path: |
+            KalyxBassRig/build/KalyxBassRig_artefacts/Release/VST3/**
+            KalyxBassRig/build/KalyxBassRig_artefacts/Release/LV2/**
+            KalyxBassRig/build/KalyxBassRig_artefacts/Release/CLAP/**
+            KalyxBassRig/build/KalyxBassRig_artefacts/Release/Standalone/**
+
   build-windows:
     name: Build Windows (VST3, LV2, CLAP, Standalone - Static MSVC)
     needs: dsp-prototype-validation
@@ -76,13 +93,17 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Configure CMake (MSVC x64)
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Configure & Build KalyxHybridConsole (MSVC x64)
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release --parallel
 
-      - name: Build All Plugin Targets (Release)
-        run: cmake --build build --config Release --parallel
+      - name: Configure & Build KalyxBassRig (MSVC x64)
+        run: |
+          cmake -S KalyxBassRig -B KalyxBassRig/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build KalyxBassRig/build --config Release --parallel
 
-      - name: Upload Windows Plugin Artifacts
+      - name: Upload KalyxHybridConsole Windows Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: KalyxHybridConsole-Windows-x64
@@ -91,3 +112,13 @@ jobs:
             build/KalyxHybridConsole_artefacts/Release/LV2/**
             build/KalyxHybridConsole_artefacts/Release/CLAP/**
             build/KalyxHybridConsole_artefacts/Release/Standalone/**
+
+      - name: Upload KalyxBassRig Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: KalyxBassRig-Windows-x64
+          path: |
+            KalyxBassRig/build/KalyxBassRig_artefacts/Release/VST3/**
+            KalyxBassRig/build/KalyxBassRig_artefacts/Release/LV2/**
+            KalyxBassRig/build/KalyxBassRig_artefacts/Release/CLAP/**
+            KalyxBassRig/build/KalyxBassRig_artefacts/Release/Standalone/**
