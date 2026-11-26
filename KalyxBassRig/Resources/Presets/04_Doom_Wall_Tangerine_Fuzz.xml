@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='utf-8'?>
+<KALYX_BASS_RIG_STATE>
+  <PARAM id="amp_model" value="3" />
+  <PARAM id="amp_gain" value="82.0" />
+  <PARAM id="amp_depth" value="0" />
+  <PARAM id="amp_boost" value="80.0" />
+  <PARAM id="amp_bass" value="5.0" />
+  <PARAM id="amp_mid" value="2.5" />
+  <PARAM id="amp_treble" value="1.5" />
+  <PARAM id="amp_drive" value="85.0" />
+  <PARAM id="amp_sag" value="65.0" />
+  <PARAM id="fx_fuzz_en" value="1" />
+  <PARAM id="fx_fuzz_sust" value="100.0" />
+  <PARAM id="fx_fuzz_tilt" value="-15.0" />
+  <PARAM id="fx_fuzz_low" value="65.0" />
+  <PARAM id="cab_a_ir" value="0" />
+  <PARAM id="di_circuit" value="3" />
+  <PARAM id="di_level" value="-10.0" />
+  <PARAM id="amp_level" value="-2.5" />
+  <PARAM id="out_fader" value="-2.0" />
+  <PARAM id="vu_ref" value="-18.0" />
+</KALYX_BASS_RIG_STATE>

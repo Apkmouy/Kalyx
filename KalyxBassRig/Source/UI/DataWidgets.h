@@ -178,4 +178,40 @@ private:
     float grDb_     { 0.0f };
 };
 
+class VectorPad2D final : public juce::Component
+{
+public:
+    VectorPad2D() = default;
+
+    void init(juce::Component& parent,
+              juce::AudioProcessorValueTreeState& apvts,
+              const juce::String& paramXId,
+              const juce::String& paramYId,
+              const juce::String& labelX,
+              const juce::String& labelY,
+              juce::Colour accent,
+              bool darkText,
+              float defX = 0.5f,
+              float defY = 0.5f);
+
+    void setUiScale(float s) noexcept { uiScale_ = std::clamp(s, 0.75f, 2.20f); repaint(); }
+    void setThemeColours(juce::Colour accent, bool darkText) noexcept;
+
+    void paint(juce::Graphics& g) override;
+    void mouseDown(const juce::MouseEvent& e) override;
+    void mouseDrag(const juce::MouseEvent& e) override;
+    void mouseDoubleClick(const juce::MouseEvent& e) override;
+
+private:
+    juce::String labelX_, labelY_;
+    juce::Colour accent_ { KalyxTheme::kalyxRoyalBlue };
+    bool darkText_ { false };
+    float uiScale_ { 1.0f };
+    float normX_ { 0.5f }, normY_ { 0.5f };
+    float defX_ { 0.5f }, defY_ { 0.5f };
+    juce::RangedAudioParameter* paramX_ { nullptr };
+    juce::RangedAudioParameter* paramY_ { nullptr };
+    std::unique_ptr<juce::ParameterAttachment> attX_, attY_;
+};
+
 } // namespace kalyx::bass::ui

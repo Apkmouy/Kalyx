@@ -156,6 +156,87 @@ enum class MicType
     addChoice("oversampling", "Oversampling", { "1x (Off)", "2x IIR", "4x IIR" }, 0);
     addChoice("ui_theme", "UI Theme", { "Night", "Day" }, 0);
 
+    // =========================================================================
+    // Pass 2: Modular Pedalboard (6 Pre-Amp + 4 Post-Amp) & Routing
+    // =========================================================================
+    // Pedal 0: Opto / FET Bass Comp
+    addBool("fx_comp_en", "Pedal Comp Enable", false);
+    addChoice("fx_comp_mode", "Pedal Comp Mode", { "OPTO", "FET" }, 0);
+    addFloat("fx_comp_amt", "Pedal Comp Amount", 0.0f, 100.0f, 40.0f, 0.1f);
+    addFloat("fx_comp_blend", "Pedal Comp Blend", 0.0f, 100.0f, 75.0f, 0.1f);
+
+    // Pedal 1: Octaver Poly/Sub
+    addBool("fx_oct_en", "Octaver Enable", false);
+    addFloat("fx_oct_clean", "Octaver Clean", 0.0f, 100.0f, 70.0f, 0.1f);
+    addFloat("fx_oct_sub1", "Octaver Sub 1", 0.0f, 100.0f, 50.0f, 0.1f);
+    addFloat("fx_oct_sub2", "Octaver Sub 2", 0.0f, 100.0f, 20.0f, 0.1f);
+    addFloat("fx_oct_up", "Octaver Oct Up", 0.0f, 100.0f, 0.0f, 0.1f);
+
+    // Pedal 2: Envelope Filter (Auto-Wah)
+    addBool("fx_env_en", "Env Filter Enable", false);
+    addFloat("fx_env_sens", "Env Filter Sens", 0.0f, 100.0f, 55.0f, 0.1f);
+    addFloat("fx_env_att", "Env Filter Attack", 1.0f, 80.0f, 8.0f, 0.1f);
+    addFloat("fx_env_dec", "Env Filter Decay", 30.0f, 600.0f, 180.0f, 1.0f);
+    addFloat("fx_env_q", "Env Filter Q", 0.8f, 10.0f, 3.5f, 0.1f);
+
+    // Pedal 3: Transparent Drive (B3K / Klon Bass)
+    addBool("fx_tdrv_en", "Transparent Drive Enable", false);
+    addFloat("fx_tdrv_drv", "Transparent Drive", 0.0f, 100.0f, 45.0f, 0.1f);
+    addFloat("fx_tdrv_tone", "Transparent Tone", 0.0f, 100.0f, 55.0f, 0.1f);
+    addFloat("fx_tdrv_blend", "Transparent Dry Blend", 0.0f, 100.0f, 50.0f, 0.1f);
+
+    // Pedal 4: Rodent Bass (ProCo Rat Modified)
+    addBool("fx_rat_en", "Rodent Bass Enable", false);
+    addFloat("fx_rat_dist", "Rodent Dist", 0.0f, 100.0f, 50.0f, 0.1f);
+    addFloat("fx_rat_flt", "Rodent Filter", 0.0f, 100.0f, 40.0f, 0.1f);
+    addFloat("fx_rat_blend", "Rodent Clean Blend", 0.0f, 100.0f, 35.0f, 0.1f);
+
+    // Pedal 5: Big Wall Fuzz (Russian Muff)
+    addBool("fx_fuzz_en", "Big Wall Fuzz Enable", false);
+    addFloat("fx_fuzz_sust", "Fuzz Sustain", 0.0f, 100.0f, 65.0f, 0.1f);
+    addFloat("fx_fuzz_tilt", "Fuzz Tilt", -100.0f, 100.0f, 0.0f, 1.0f);
+    addFloat("fx_fuzz_low", "Fuzz Low Recovery", 0.0f, 100.0f, 45.0f, 0.1f);
+
+    // Pedal 6: Dimension Chorus
+    addBool("fx_cho_en", "Chorus Enable", false);
+    addFloat("fx_cho_rate", "Chorus Rate", 0.1f, 5.0f, 0.8f, 0.01f);
+    addFloat("fx_cho_depth", "Chorus Depth", 0.0f, 100.0f, 45.0f, 0.1f);
+    addFloat("fx_cho_mix", "Chorus Mix", 0.0f, 100.0f, 40.0f, 0.1f);
+
+    // Pedal 7: Analog Phaser
+    addBool("fx_pha_en", "Phaser Enable", false);
+    addChoice("fx_pha_stages", "Phaser Stages", { "4-Stage", "8-Stage" }, 0);
+    addBool("fx_pha_sync", "Phaser Host Sync", false);
+    addChoice("fx_pha_div", "Phaser Sync Div", { "1/4", "1/8", "1/8D", "1/16" }, 0);
+    addFloat("fx_pha_rate", "Phaser Rate", 0.05f, 8.0f, 0.6f, 0.01f);
+    addFloat("fx_pha_depth", "Phaser Depth", 0.0f, 100.0f, 60.0f, 0.1f);
+    addFloat("fx_pha_fb", "Phaser Feedback", 0.0f, 90.0f, 35.0f, 0.1f);
+
+    // Pedal 8: Tape Echo
+    addBool("fx_tape_en", "Tape Echo Enable", false);
+    addBool("fx_tape_sync", "Tape Host Sync", true);
+    addChoice("fx_tape_div", "Tape Sync Div", { "1/4", "1/8", "1/8D", "1/16" }, 2);
+    addFloat("fx_tape_time", "Tape Time ms", 40.0f, 1200.0f, 320.0f, 1.0f);
+    addFloat("fx_tape_rep", "Tape Repeats", 0.0f, 92.0f, 38.0f, 0.1f);
+    addFloat("fx_tape_mix", "Tape Mix", 0.0f, 100.0f, 28.0f, 0.1f);
+
+    // Pedal 9: Studio Bass EQ + Mono Maker
+    addBool("fx_eq4_en", "Studio EQ Enable", false);
+    addFloat("fx_eq4_mono_freq", "Mono Maker Hz", 20.0f, 250.0f, 120.0f, 1.0f);
+    addFloat("fx_eq4_b1", "EQ4 60 Hz", -12.0f, 12.0f, 0.0f, 0.1f);
+    addFloat("fx_eq4_b2", "EQ4 250 Hz", -12.0f, 12.0f, 0.0f, 0.1f);
+    addFloat("fx_eq4_b3", "EQ4 1.2 kHz", -12.0f, 12.0f, 0.0f, 0.1f);
+    addFloat("fx_eq4_b4", "EQ4 4.5 kHz", -12.0f, 12.0f, 0.0f, 0.1f);
+
+    // Routing order (10 slots: 0..5 default PRE, 6..9 default POST)
+    for (int i = 0; i < 10; ++i)
+    {
+        const juce::String posId  = "fx_pos_" + juce::String(i);
+        const juce::String postId = "fx_post_" + juce::String(i);
+        p.push_back(std::make_unique<juce::AudioParameterInt>(juce::ParameterID{ posId, 1 }, posId, 0, 9, i));
+        p.push_back(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{ postId, 1 }, postId, i >= 6));
+    }
+
     return { p.begin(), p.end() };
 }
 

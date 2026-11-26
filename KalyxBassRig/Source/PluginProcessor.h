@@ -8,6 +8,7 @@
 #include "DSP/DIPathDSP.h"
 #include "DSP/DualCabDSP.h"
 #include "DSP/MasterAndTunerDSP.h"
+#include "FX/PedalboardEngine.h"
 #include <atomic>
 #include <vector>
 
@@ -54,6 +55,7 @@ public:
     [[nodiscard]] float getAmpSag()    const noexcept { return ampEngine_.getSagVoltsDrop(); }
     [[nodiscard]] float getDIGrDb()    const noexcept { return diEngine_.getOptoGrDb(); }
     [[nodiscard]] float getLimGrDb()   const noexcept { return limiter_.getGrDb(); }
+    [[nodiscard]] float getPedalCompGrDb() const noexcept { return pedalboard_.getCompGrDb(); }
     [[nodiscard]] float getGateGain()  const noexcept { return gate_.getGateGain(); }
     [[nodiscard]] float getKickDuck()  const noexcept { return kickRelief_.getDuckDb(); }
 
@@ -74,6 +76,7 @@ private:
 
     kalyx::bass::dsp::NoiseGate64      gate_;
     kalyx::bass::dsp::StrobeTuner64    tuner_;
+    kalyx::bass::fx::PedalboardEngine  pedalboard_;
     kalyx::bass::dsp::TubeAmpEngine    ampEngine_;
     kalyx::bass::dsp::DIPathEngine     diEngine_;
     kalyx::bass::dsp::DualCabEngine    dualCab_;
@@ -81,10 +84,13 @@ private:
     kalyx::bass::dsp::BrickwallLimiter64 limiter_;
 
     // Pre-allocated work buffers (zero allocation in processBlock)
-    std::vector<float> ampMonoBuf_;
-    std::vector<float> cabOutL_;
-    std::vector<float> cabOutR_;
-    std::vector<float> diMonoBuf_;
+    std::vector<double> preMonoBuf_;
+    std::vector<float>  ampMonoBuf_;
+    std::vector<float>  cabOutL_;
+    std::vector<float>  cabOutR_;
+    std::vector<float>  diMonoBuf_;
+    std::vector<double> postBufL_;
+    std::vector<double> postBufR_;
 
     double hostSampleRate_ { 48000.0 };
     double vuEnvIn_  { 0.0 };

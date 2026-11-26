@@ -29,13 +29,17 @@ void KalyxBassRigProcessor::prepareToPlay(double sampleRate, int samplesPerBlock
     hostSampleRate_ = std::max(sampleRate, 8000.0);
     const size_t maxN = static_cast<size_t>(std::max(samplesPerBlock, 64));
 
+    preMonoBuf_.assign(maxN, 0.0);
     ampMonoBuf_.assign(maxN, 0.0f);
     cabOutL_.assign(maxN, 0.0f);
     cabOutR_.assign(maxN, 0.0f);
     diMonoBuf_.assign(maxN, 0.0f);
+    postBufL_.assign(maxN, 0.0);
+    postBufR_.assign(maxN, 0.0);
 
     gate_.prepare(hostSampleRate_);
     tuner_.prepare(hostSampleRate_);
+    pedalboard_.prepare(hostSampleRate_);
     ampEngine_.prepare(hostSampleRate_);
     diEngine_.prepare(hostSampleRate_);
     kickRelief_.prepare(hostSampleRate_);
@@ -55,6 +59,7 @@ void KalyxBassRigProcessor::releaseResources()
 {
     gate_.reset();
     tuner_.reset();
+    pedalboard_.reset();
     ampEngine_.reset();
     diEngine_.reset();
     dualCab_.reset();
@@ -192,7 +197,94 @@ void KalyxBassRigProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     const double vuCoeff = std::exp(-1.0 / (0.300 * hostSampleRate_));
     const double corrCoeff = std::exp(-1.0 / (0.120 * hostSampleRate_));
 
-    // 2. Input -> Gate -> Tuner -> Parallel Amp & DI
+    // 2. Host Sync & Pedalboard State
+    kalyx::bass::fx::HostSyncInfo syncInfo;
+    if (auto* ph = getPlayHead())
+    {
+        if (const auto pos = ph->getPosition())
+        {
+            if (const auto bpmOpt = pos->getBpm())
+                syncInfo.bpm = *bpmOpt;
+            syncInfo.isPlaying = pos->getIsPlaying();
+        }
+    }
+
+    kalyx::bass::fx::PedalboardState pbSt;
+    pbSt.compEn    = getF("fx_comp_en") > 0.5f;
+    pbSt.compMode  = static_cast<int>(getF("fx_comp_mode"));
+    pbSt.compAmt   = getF("fx_comp_amt");
+    pbSt.compBlend = getF("fx_comp_blend");
+
+    pbSt.octEn    = getF("fx_oct_en") > 0.5f;
+    pbSt.octClean = getF("fx_oct_clean");
+    pbSt.octSub1  = getF("fx_oct_sub1");
+    pbSt.octSub2  = getF("fx_oct_sub2");
+    pbSt.octUp    = getF("fx_oct_up");
+
+    pbSt.envEn   = getF("fx_env_en") > 0.5f;
+    pbSt.envSens = getF("fx_env_sens");
+    pbSt.envAtt  = getF("fx_env_att");
+    pbSt.envDec  = getF("fx_env_dec");
+    pbSt.envQ    = getF("fx_env_q");
+
+    pbSt.tdrvEn    = getF("fx_tdrv_en") > 0.5f;
+    pbSt.tdrvDrv   = getF("fx_tdrv_drv");
+    pbSt.tdrvTone  = getF("fx_tdrv_tone");
+    pbSt.tdrvBlend = getF("fx_tdrv_blend");
+
+    pbSt.ratEn    = getF("fx_rat_en") > 0.5f;
+    pbSt.ratDist  = getF("fx_rat_dist");
+    pbSt.ratFlt   = getF("fx_rat_flt");
+    pbSt.ratBlend = getF("fx_rat_blend");
+
+    pbSt.fuzzEn   = getF("fx_fuzz_en") > 0.5f;
+    pbSt.fuzzSust = getF("fx_fuzz_sust");
+    pbSt.fuzzTilt = getF("fx_fuzz_tilt");
+    pbSt.fuzzLow  = getF("fx_fuzz_low");
+
+    pbSt.choEn    = getF("fx_cho_en") > 0.5f;
+    pbSt.choRate  = getF("fx_cho_rate");
+    pbSt.choDepth = getF("fx_cho_depth");
+    pbSt.choMix   = getF("fx_cho_mix");
+
+    pbSt.phaEn     = getF("fx_pha_en") > 0.5f;
+    pbSt.phaStages = static_cast<int>(getF("fx_pha_stages"));
+    pbSt.phaSync   = getF("fx_pha_sync") > 0.5f;
+    pbSt.phaDiv    = static_cast<int>(getF("fx_pha_div"));
+    pbSt.phaRate   = getF("fx_pha_rate");
+    pbSt.phaDepth  = getF("fx_pha_depth");
+    pbSt.phaFb     = getF("fx_pha_fb");
+
+    pbSt.tapeEn     = getF("fx_tape_en") > 0.5f;
+    pbSt.tapeSync   = getF("fx_tape_sync") > 0.5f;
+    pbSt.tapeDiv    = static_cast<int>(getF("fx_tape_div"));
+    pbSt.tapeTimeMs = getF("fx_tape_time");
+    pbSt.tapeRep    = getF("fx_tape_rep");
+    pbSt.tapeMix    = getF("fx_tape_mix");
+
+    pbSt.eq4En     = getF("fx_eq4_en") > 0.5f;
+    pbSt.eq4MonoHz = getF("fx_eq4_mono_freq");
+    pbSt.eq4B1     = getF("fx_eq4_b1");
+    pbSt.eq4B2     = getF("fx_eq4_b2");
+    pbSt.eq4B3     = getF("fx_eq4_b3");
+    pbSt.eq4B4     = getF("fx_eq4_b4");
+
+    static constexpr const char* kPosIds[kalyx::bass::fx::NumPedals] = {
+        "fx_pos_0", "fx_pos_1", "fx_pos_2", "fx_pos_3", "fx_pos_4",
+        "fx_pos_5", "fx_pos_6", "fx_pos_7", "fx_pos_8", "fx_pos_9"
+    };
+    static constexpr const char* kPostIds[kalyx::bass::fx::NumPedals] = {
+        "fx_post_0", "fx_post_1", "fx_post_2", "fx_post_3", "fx_post_4",
+        "fx_post_5", "fx_post_6", "fx_post_7", "fx_post_8", "fx_post_9"
+    };
+    for (int i = 0; i < kalyx::bass::fx::NumPedals; ++i)
+    {
+        pbSt.pos[static_cast<size_t>(i)]    = static_cast<int>(getF(kPosIds[i]));
+        pbSt.isPost[static_cast<size_t>(i)] = getF(kPostIds[i]) > 0.5f;
+    }
+    pedalboard_.setState(pbSt, syncInfo);
+
+    // 3. Input -> Gate -> PRE-AMP FX -> Parallel Amp & DI
     for (int i = 0; i < numSamples; ++i)
     {
         double monoIn = 0.5 * (static_cast<double>(inL[i]) + static_cast<double>(inR[i])) * inTrimGain;
@@ -202,23 +294,25 @@ void KalyxBassRigProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
         if (tunerMute)
             monoIn = 0.0;
 
-        monoIn = gate_.processSample(monoIn, gateEn, gateThresh);
+        preMonoBuf_[static_cast<size_t>(i)] = gate_.processSample(monoIn, gateEn, gateThresh);
+    }
 
-        const double ampS = ampEn ? ampEngine_.processSample(monoIn) : monoIn;
-        const double diS  = diEngine_.processSample(monoIn);
+    pedalboard_.processPre(preMonoBuf_.data(), numSamples);
+
+    for (int i = 0; i < numSamples; ++i)
+    {
+        const double preS = preMonoBuf_[static_cast<size_t>(i)];
+        const double ampS = ampEn ? ampEngine_.processSample(preS) : preS;
+        const double diS  = diEngine_.processSample(preS);
 
         ampMonoBuf_[static_cast<size_t>(i)] = static_cast<float>(ampS);
         diMonoBuf_[static_cast<size_t>(i)]  = static_cast<float>(diS);
     }
 
-    // 3. Dual Cabinet IR + 2D Mic + Room
+    // 4. Dual Cabinet IR + 2D Mic + Room
     dualCab_.processBlock(ampMonoBuf_.data(), cabOutL_.data(), cabOutR_.data(), numSamples);
 
-    // 4. Sum Amp+Cab & DI -> Kick-Relief -> Brickwall Limiter -> Out Fader
-    auto outBus = getBusBuffer(buffer, false, 0);
-    float* outL = outBus.getWritePointer(0);
-    float* outR = (outBus.getNumChannels() > 1) ? outBus.getWritePointer(1) : outL;
-
+    // 5. Sum Amp+Cab & DI -> POST-AMP FX -> Kick-Relief -> Brickwall Limiter -> Out Fader
     for (int i = 0; i < numSamples; ++i)
     {
         const double aL = static_cast<double>(cabOutL_[static_cast<size_t>(i)]) * ampLevelGain;
@@ -230,8 +324,20 @@ void KalyxBassRigProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
         corrDenA_ = corrCoeff * corrDenA_ + (1.0 - corrCoeff) * (aMono * aMono);
         corrDenB_ = corrCoeff * corrDenB_ + (1.0 - corrCoeff) * (d * d);
 
-        double sumL = aL + d;
-        double sumR = aR + d;
+        postBufL_[static_cast<size_t>(i)] = aL + d;
+        postBufR_[static_cast<size_t>(i)] = aR + d;
+    }
+
+    pedalboard_.processPost(postBufL_.data(), postBufR_.data(), numSamples);
+
+    auto outBus = getBusBuffer(buffer, false, 0);
+    float* outL = outBus.getWritePointer(0);
+    float* outR = (outBus.getNumChannels() > 1) ? outBus.getWritePointer(1) : outL;
+
+    for (int i = 0; i < numSamples; ++i)
+    {
+        double sumL = postBufL_[static_cast<size_t>(i)];
+        double sumR = postBufR_[static_cast<size_t>(i)];
 
         const double scS = (scL != nullptr) ? static_cast<double>(scL[i]) : 0.0;
         kickRelief_.processStereo(sumL, sumR, scS, kickEn, kickAmt);

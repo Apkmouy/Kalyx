@@ -4,6 +4,7 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
     : AudioProcessorEditor(&proc),
       proc_(proc),
       tunerBar_(proc),
+      pedalboardView_(proc.getAPVTS()),
       ampGraph_(proc),
       settingsOverlay_(proc)
 {
@@ -49,6 +50,30 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
 
     settingsBtn_.onClick = [this]() { settingsOverlay_.setVisible(true); settingsOverlay_.toFront(true); };
     addAndMakeVisible(settingsBtn_);
+
+    rigTabBtn_.setClickingTogglesState(true);
+    pedalsTabBtn_.setClickingTogglesState(true);
+    rigTabBtn_.setToggleState(true, juce::dontSendNotification);
+    rigTabBtn_.onClick = [this]()
+    {
+        showPedalboard_ = false;
+        rigTabBtn_.setToggleState(true, juce::dontSendNotification);
+        pedalsTabBtn_.setToggleState(false, juce::dontSendNotification);
+        pedalboardView_.setVisible(false);
+        repaint();
+    };
+    pedalsTabBtn_.onClick = [this]()
+    {
+        showPedalboard_ = true;
+        rigTabBtn_.setToggleState(false, juce::dontSendNotification);
+        pedalsTabBtn_.setToggleState(true, juce::dontSendNotification);
+        pedalboardView_.syncOrderFromAPVTS();
+        pedalboardView_.setVisible(true);
+        pedalboardView_.toFront(false);
+        repaint();
+    };
+    addAndMakeVisible(rigTabBtn_);
+    addAndMakeVisible(pedalsTabBtn_);
 
     // Left Column: Input & DI
     inTrimKnob_.init(*this, apvts, "in_trim", "IN TRIM", KalyxTheme::kalyxRoyalBlue, true, dark, 0.0,
@@ -205,6 +230,7 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
     kickAmtBar_.init(*this, apvts, "kick_relief_amt", "KICK DUCK", KalyxTheme::kalyxAubergine, false, dark, 45.0, fmtPct);
     limCeilBar_.init(*this, apvts, "lim_ceiling", "CEILING", KalyxTheme::alertRed, false, dark, -0.3, fmtDb);
 
+    addChildComponent(pedalboardView_);
     addChildComponent(settingsOverlay_);
 
     setResizable(true, true);
@@ -240,6 +266,7 @@ void KalyxBassRigEditor::timerCallback()
     gateCurve_.setGateGain(proc_.getGateGain());
     ampGraph_.setThdHeatmap(proc_.getAmpThd());
     phaseCorrBar_.setCorrelation(proc_.getPhaseCorr());
+    pedalboardView_.setCompGrDb(proc_.getPedalCompGrDb());
 
     if (auto* p = proc_.getAPVTS().getRawParameterValue("vu_mode"))
         vuMeter_.setMode(static_cast<int>(p->load(std::memory_order_relaxed)));
@@ -276,6 +303,7 @@ void KalyxBassRigEditor::applyTheme()
     micPad2D_.setDarkText(dark);
     phaseCorrBar_.setDarkText(dark);
     vuMeter_.setDarkText(dark);
+    pedalboardView_.setDarkText(dark);
     settingsOverlay_.setTheme(theme_);
 
     inTrimKnob_.setThemeColours(KalyxTheme::getAccent(theme_), dark);
@@ -428,18 +456,24 @@ void KalyxBassRigEditor::resized()
     outFader_.setUiScale(sc);
     kickAmtBar_.setUiScale(sc);
     limCeilBar_.setUiScale(sc);
+    pedalboardView_.setUiScale(sc);
     settingsOverlay_.setUiScale(sc);
     settingsOverlay_.setBounds(getLocalBounds());
 
     const int pad  = static_cast<int>(10.0f * sc);
     const int hdrH = static_cast<int>(46.0f * sc);
+    pedalboardView_.setBounds(0, hdrH, getWidth(), getHeight() - hdrH);
 
     // Header layout
-    int hx = static_cast<int>(262.0f * sc);
-    const int tunerW = static_cast<int>(270.0f * sc);
+    int hx = static_cast<int>(258.0f * sc);
+    const int tunerW = static_cast<int>(240.0f * sc);
     tunerBar_.setBounds(hx, static_cast<int>(8.0f * sc), tunerW, static_cast<int>(30.0f * sc));
-    hx += tunerW + static_cast<int>(6.0f * sc);
-    tunerMuteBtn_.setBounds(hx, static_cast<int>(10.0f * sc), static_cast<int>(54.0f * sc), static_cast<int>(26.0f * sc));
+    hx += tunerW + static_cast<int>(5.0f * sc);
+    tunerMuteBtn_.setBounds(hx, static_cast<int>(10.0f * sc), static_cast<int>(48.0f * sc), static_cast<int>(26.0f * sc));
+    hx += static_cast<int>(56.0f * sc);
+    rigTabBtn_.setBounds(hx, static_cast<int>(10.0f * sc), static_cast<int>(48.0f * sc), static_cast<int>(26.0f * sc));
+    hx += static_cast<int>(52.0f * sc);
+    pedalsTabBtn_.setBounds(hx, static_cast<int>(10.0f * sc), static_cast<int>(64.0f * sc), static_cast<int>(26.0f * sc));
 
     int rx = getWidth() - pad;
     auto placeRight = [&](juce::Component& c, int w)

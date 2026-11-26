@@ -104,9 +104,11 @@ target_sources(KalyxBassRig
         Source/DSP/DIPathDSP.cpp
         Source/DSP/DualCabDSP.cpp
         Source/DSP/MasterAndTunerDSP.cpp
+        Source/FX/PedalboardEngine.cpp
         Source/UI/KalyxLookAndFeel.cpp
         Source/UI/DataWidgets.cpp
         Source/UI/BassRigWidgets.cpp
+        Source/UI/PedalboardUI.cpp
         Source/PluginProcessor.cpp
         Source/PluginEditor.cpp
 )

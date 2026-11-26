@@ -554,4 +554,100 @@ void AnalogVUMeter::paint(juce::Graphics& g)
     g.drawFittedText(readout, r.withTrimmedTop(4.0f * sc).withHeight(14.0f * sc).toNearestInt(), juce::Justification::centred, 1);
 }
 
+// ==============================================================================
+// VectorPad2D
+// ==============================================================================
+void VectorPad2D::init(juce::Component& parent,
+                       juce::AudioProcessorValueTreeState& apvts,
+                       const juce::String& paramXId,
+                       const juce::String& paramYId,
+                       const juce::String& labelX,
+                       const juce::String& labelY,
+                       juce::Colour accent,
+                       bool darkText,
+                       float defX,
+                       float defY)
+{
+    labelX_ = labelX;
+    labelY_ = labelY;
+    accent_ = accent;
+    darkText_ = darkText;
+    defX_ = defX;
+    defY_ = defY;
+
+    paramX_ = apvts.getParameter(paramXId);
+    paramY_ = apvts.getParameter(paramYId);
+    if (paramX_ != nullptr)
+    {
+        attX_ = std::make_unique<juce::ParameterAttachment>(*paramX_, [this](float v)
+        {
+            normX_ = paramX_->convertTo0to1(v);
+            repaint();
+        });
+        attX_->sendInitialUpdate();
+    }
+    if (paramY_ != nullptr)
+    {
+        attY_ = std::make_unique<juce::ParameterAttachment>(*paramY_, [this](float v)
+        {
+            normY_ = paramY_->convertTo0to1(v);
+            repaint();
+        });
+        attY_->sendInitialUpdate();
+    }
+    parent.addAndMakeVisible(*this);
+}
+
+void VectorPad2D::setThemeColours(juce::Colour accent, bool darkText) noexcept
+{
+    accent_ = accent;
+    darkText_ = darkText;
+    repaint();
+}
+
+void VectorPad2D::paint(juce::Graphics& g)
+{
+    const float sc = uiScale_;
+    const auto r = getLocalBounds().toFloat().reduced(1.0f * sc);
+    const auto bg = darkText_ ? KalyxTheme::dayControlIdleBg : KalyxTheme::nightControlIdleBg;
+    const auto bd = darkText_ ? KalyxTheme::dayGridBorder : KalyxTheme::nightGridBorder;
+    const auto tx = darkText_ ? KalyxTheme::dayTextPrimary : KalyxTheme::nightTextPrimary;
+
+    g.setColour(bg);
+    g.fillRoundedRectangle(r, 4.0f * sc);
+    g.setColour(bd);
+    g.drawRoundedRectangle(r, 4.0f * sc, 1.0f * sc);
+
+    const auto pad = r.reduced(6.0f * sc);
+    g.setColour(tx.withAlpha(0.12f));
+    g.drawLine(pad.getCentreX(), pad.getY(), pad.getCentreX(), pad.getBottom(), 1.0f * sc);
+    g.drawLine(pad.getX(), pad.getCentreY(), pad.getRight(), pad.getCentreY(), 1.0f * sc);
+
+    const float px = pad.getX() + normX_ * pad.getWidth();
+    const float py = pad.getBottom() - normY_ * pad.getHeight();
+    g.setColour(accent_.withAlpha(0.28f));
+    g.fillEllipse(px - 8.0f * sc, py - 8.0f * sc, 16.0f * sc, 16.0f * sc);
+    g.setColour(accent_);
+    g.fillEllipse(px - 4.0f * sc, py - 4.0f * sc, 8.0f * sc, 8.0f * sc);
+
+    g.setColour(tx.withAlpha(0.68f));
+    g.setFont(KalyxTheme::makeMonoFont(8.5f * sc, juce::Font::plain));
+    g.drawFittedText(labelX_ + " x " + labelY_, pad.toNearestInt(), juce::Justification::bottomLeft, 1);
+}
+
+void VectorPad2D::mouseDown(const juce::MouseEvent& e) { mouseDrag(e); }
+void VectorPad2D::mouseDrag(const juce::MouseEvent& e)
+{
+    const auto pad = getLocalBounds().toFloat().reduced(6.0f * uiScale_);
+    const float nx = std::clamp((static_cast<float>(e.x) - pad.getX()) / std::max(10.0f, pad.getWidth()), 0.0f, 1.0f);
+    const float ny = std::clamp((pad.getBottom() - static_cast<float>(e.y)) / std::max(10.0f, pad.getHeight()), 0.0f, 1.0f);
+    if (paramX_ && attX_) attX_->setValueAsCompleteGesture(paramX_->convertFrom0to1(nx));
+    if (paramY_ && attY_) attY_->setValueAsCompleteGesture(paramY_->convertFrom0to1(ny));
+}
+void VectorPad2D::mouseDoubleClick(const juce::MouseEvent&)
+{
+    if (paramX_ && attX_) attX_->setValueAsCompleteGesture(paramX_->convertFrom0to1(defX_));
+    if (paramY_ && attY_) attY_->setValueAsCompleteGesture(paramY_->convertFrom0to1(defY_));
+}
+
 } // namespace kalyx::bass::ui

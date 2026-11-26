@@ -164,6 +164,10 @@ def main() -> int:
         ("Kalyx Hybrid 4-PRO (SVT-4PRO)", 0.05, 3.5, [40.0, 90.0, 180.0, 300.0, 500.0, 1000.0, 2000.0, 4000.0, 10000.0]),
         ("Kalyx Tangerine 200 (OR200 MkII)", 0.11, 4.2, [100.0, 1000.0]),
         ("DI Path (Tube / 2503 / 73 / Sub)", 0.06, 2.0, [40.0, 120.0]),
+        ("FX: Transparent Drive (B3K/Klon)", 0.14, 5.5, [1200.0]),
+        ("FX: Rodent Bass (ProCo Rat)", 0.06, 8.5, [140.0, 1800.0]),
+        ("FX: Big Wall Fuzz (Russian Muff)", 0.00, 14.0, [85.0, 750.0]),
+        ("FX: Tape Echo Feedback ADAA", 0.00, 1.35, [3400.0]),
     ]
     for fs in (44100.0, 192000.0):
         for name, bias, drive, freqs in models:

@@ -5,6 +5,7 @@
 #include "UI/KalyxTheme.h"
 #include "UI/DataWidgets.h"
 #include "UI/BassRigWidgets.h"
+#include "UI/PedalboardUI.h"
 #include <memory>
 
 class KalyxBassRigEditor final : public juce::AudioProcessorEditor,
@@ -38,6 +39,10 @@ private:
     juce::TextButton copyBtn_ { "COPY" };
     juce::TextButton themeBtn_ { "DAY" };
     juce::TextButton settingsBtn_ { "SETTINGS" };
+    juce::TextButton rigTabBtn_ { "RIG" };
+    juce::TextButton pedalsTabBtn_ { "PEDALS" };
+    bool showPedalboard_ { false };
+    kalyx::bass::ui::PedalboardView pedalboardView_;
 
     // Left Column: Input & DI Path
     kalyx::bass::ui::KalyxRotaryControl inTrimKnob_;

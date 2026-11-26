@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='utf-8'?>
+<KALYX_BASS_RIG_STATE>
+  <PARAM id="amp_en" value="0" />
+  <PARAM id="cab_en" value="0" />
+  <PARAM id="di_circuit" value="0" />
+  <PARAM id="di_lpf_freq" value="200.0" />
+  <PARAM id="di_level" value="0.0" />
+  <PARAM id="amp_level" value="-60.0" />
+  <PARAM id="fx_oct_en" value="1" />
+  <PARAM id="fx_oct_clean" value="45.0" />
+  <PARAM id="fx_oct_sub1" value="100.0" />
+  <PARAM id="fx_oct_sub2" value="100.0" />
+  <PARAM id="fx_oct_up" value="0.0" />
+  <PARAM id="fx_env_en" value="1" />
+  <PARAM id="fx_env_sens" value="65.0" />
+  <PARAM id="fx_env_q" value="4.5" />
+  <PARAM id="fx_tape_en" value="1" />
+  <PARAM id="fx_tape_sync" value="1" />
+  <PARAM id="fx_tape_div" value="2" />
+  <PARAM id="fx_tape_rep" value="48.0" />
+  <PARAM id="fx_tape_mix" value="34.0" />
+  <PARAM id="out_fader" value="-1.5" />
+  <PARAM id="vu_ref" value="-18.0" />
+</KALYX_BASS_RIG_STATE>
