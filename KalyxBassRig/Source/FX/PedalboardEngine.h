@@ -51,7 +51,7 @@ struct PedalboardState
     double phaRate { 0.6 }; double phaDepth { 60.0 }; double phaFb { 35.0 };
     // 8: Tape Echo
     bool   tapeEn { false }; bool tapeSync { true }; int tapeDiv { 2 };
-    double tapeTimeMs { 320.0 }; double tapeRep { 38.0 }; double tapeMix { 28.0 };
+    double tapeTimeMs { 320.0 }; double tapeRep { 38.0 }; double tapeWow { 25.0 }; double tapeFlutter { 20.0 }; double tapeSat { 35.0 }; double tapeMix { 28.0 };
     // 9: Studio Bass EQ + Mono Maker
     bool   eq4En { false }; double eq4MonoHz { 120.0 };
     double eq4B1 { 0.0 }; double eq4B2 { 0.0 }; double eq4B3 { 0.0 }; double eq4B4 { 0.0 };
@@ -78,6 +78,7 @@ public:
     void processPost(double* bufL, double* bufR, int numSamples) noexcept;
 
     [[nodiscard]] float getCompGrDb() const noexcept { return compGrDb_.load(std::memory_order_relaxed); }
+    [[nodiscard]] float getCompInDb() const noexcept { return compInDb_.load(std::memory_order_relaxed); }
 
     [[nodiscard]] static double divisionToMs(int divIdx, double bpm) noexcept;
 
@@ -108,6 +109,7 @@ private:
     // 0: Comp
     double compEnv_ { 0.0 };
     std::atomic<float> compGrDb_ { 0.0f };
+    std::atomic<float> compInDb_ { -60.0f };
 
     // 1: Octaver (Zero-crossing + LPF)
     dsp::ZDFStateVariableFilter octTrackLPF_;
@@ -146,6 +148,7 @@ private:
     std::array<double, kMaxTapeDelay> tapeBufL_ {}, tapeBufR_ {};
     int tapeWrite_ { 0 };
     double tapeWowPhase_ { 0.0 };
+    double tapeFlutterPhase_ { 0.0 };
     dsp::ADAASaturator tapeSatL_, tapeSatR_;
     dsp::OnePoleTPT tapeWarmL_, tapeWarmR_;
 

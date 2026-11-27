@@ -81,10 +81,13 @@ private:
     bool  darkText_ { false };
 };
 
-class AmpToneEQGraphWidget final : public juce::Component
+class AmpToneEQGraphWidget final : public juce::Component,
+                                     private juce::AudioProcessorValueTreeState::Listener,
+                                     private juce::AsyncUpdater
 {
 public:
     explicit AmpToneEQGraphWidget(KalyxBassRigProcessor& proc);
+    ~AmpToneEQGraphWidget() override;
     void setUiScale(float s) noexcept { uiScale_ = std::clamp(s, 0.75f, 2.20f); repaint(); }
     void setDarkText(bool d) noexcept { darkText_ = d; repaint(); }
     void setAccentColour(juce::Colour c) noexcept { accent_ = c; repaint(); }
@@ -98,6 +101,8 @@ public:
     void mouseDoubleClick(const juce::MouseEvent& e) override;
 
 private:
+    void parameterChanged(const juce::String&, float) override { triggerAsyncUpdate(); }
+    void handleAsyncUpdate() override { repaint(); }
     [[nodiscard]] float freqToX(float hz, const juce::Rectangle<float>& area) const noexcept;
     [[nodiscard]] float gainToY(float db, const juce::Rectangle<float>& area) const noexcept;
     [[nodiscard]] float yToGain(float y, const juce::Rectangle<float>& area) const noexcept;

@@ -34,6 +34,7 @@ void PedalboardEngine::reset() noexcept
 {
     compEnv_ = 0.0;
     compGrDb_.store(0.0f, std::memory_order_relaxed);
+    compInDb_.store(-60.0f, std::memory_order_relaxed);
 
     octTrackLPF_.reset(); octSub1LPF_.reset(); octSub2LPF_.reset(); octUpHPF_.reset();
     octPrev_ = 0.0; octFF1_ = 1.0; octFF2_ = 1.0; octEnv_ = 0.0;
@@ -203,6 +204,7 @@ void PedalboardEngine::runComp(double& l, double& r) noexcept
     if (!state_.compEn || (std::abs(l) < 1.0e-7 && std::abs(r) < 1.0e-7))
     {
         compGrDb_.store(0.0f, std::memory_order_relaxed);
+        compInDb_.store(-60.0f, std::memory_order_relaxed);
         return;
     }
     const bool isFet = (state_.compMode == 1);
@@ -214,6 +216,9 @@ void PedalboardEngine::runComp(double& l, double& r) noexcept
     const double det = std::max(std::abs(l), std::abs(r));
     compEnv_ = (det > compEnv_) ? (att * compEnv_ + (1.0 - att) * det)
                                 : (rel * compEnv_ + (1.0 - rel) * det);
+
+    const float inDb = (compEnv_ > 1.0e-6) ? static_cast<float>(20.0 * std::log10(compEnv_)) : -60.0f;
+    compInDb_.store(inDb, std::memory_order_relaxed);
 
     const double amt = std::clamp(state_.compAmt / 100.0, 0.0, 1.0);
     const double thresh = 0.50 - 0.42 * amt;
@@ -430,12 +435,16 @@ void PedalboardEngine::runTapeEcho(double& l, double& r) noexcept
 
     const double baseMs = state_.tapeSync ? divisionToMs(state_.tapeDiv, sync_.bpm)
                                           : std::clamp(state_.tapeTimeMs, 40.0, 1200.0);
-    // Wow & Flutter slow LFO
+    // Wow (slow 0.42 Hz) & Flutter (fast 5.8 Hz)
     tapeWowPhase_ += kTwoPi * 0.42 / sampleRate_;
     if (tapeWowPhase_ >= kTwoPi) tapeWowPhase_ -= kTwoPi;
-    const double wowMs = 1.8 * std::sin(tapeWowPhase_);
+    tapeFlutterPhase_ += kTwoPi * 5.80 / sampleRate_;
+    if (tapeFlutterPhase_ >= kTwoPi) tapeFlutterPhase_ -= kTwoPi;
 
-    const double dSamp = std::clamp((baseMs + wowMs) * 0.001 * sampleRate_, 1.0, static_cast<double>(kMaxTapeDelay - 2));
+    const double wowMs     = (state_.tapeWow / 100.0) * 4.5 * std::sin(tapeWowPhase_);
+    const double flutterMs = (state_.tapeFlutter / 100.0) * 1.1 * std::sin(tapeFlutterPhase_);
+
+    const double dSamp = std::clamp((baseMs + wowMs + flutterMs) * 0.001 * sampleRate_, 1.0, static_cast<double>(kMaxTapeDelay - 2));
     const int i0 = static_cast<int>(dSamp);
     const double frac = dSamp - static_cast<double>(i0);
     int idx0 = tapeWrite_ - i0; if (idx0 < 0) idx0 += kMaxTapeDelay;
@@ -444,9 +453,10 @@ void PedalboardEngine::runTapeEcho(double& l, double& r) noexcept
     const double wetL = tapeBufL_[static_cast<size_t>(idx0)] * (1.0 - frac) + tapeBufL_[static_cast<size_t>(idx1)] * frac;
     const double wetR = tapeBufR_[static_cast<size_t>(idx0)] * (1.0 - frac) + tapeBufR_[static_cast<size_t>(idx1)] * frac;
 
-    const double rep = std::clamp(state_.tapeRep / 100.0, 0.0, 0.92);
-    double fbL = tapeWarmL_.processLP(tapeSatL_.processADAA1(l + wetL * rep, 1.35, 0.0));
-    double fbR = tapeWarmR_.processLP(tapeSatR_.processADAA1(r + wetR * rep, 1.35, 0.0));
+    const double rep   = std::clamp(state_.tapeRep / 100.0, 0.0, 0.92);
+    const double drive = 1.0 + (std::clamp(state_.tapeSat, 0.0, 100.0) / 100.0) * 3.5;
+    double fbL = tapeWarmL_.processLP(tapeSatL_.processADAA1(l + wetL * rep, drive, 0.0));
+    double fbR = tapeWarmR_.processLP(tapeSatR_.processADAA1(r + wetR * rep, drive, 0.0));
 
     tapeBufL_[static_cast<size_t>(tapeWrite_)] = std::isfinite(fbL) ? fbL : 0.0;
     tapeBufR_[static_cast<size_t>(tapeWrite_)] = std::isfinite(fbR) ? fbR : 0.0;

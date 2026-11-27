@@ -17,7 +17,6 @@ constexpr double kFACCapacitorsF[6] = {
 };
 
 constexpr double kMidFreqs5[5] = { 220.0, 450.0, 800.0, 1600.0, 3000.0 };
-constexpr double kHeritageMidFreqs3[3] = { 220.0, 800.0, 3000.0 };
 } // namespace
 
 void TubeAmpEngine::prepare(double sampleRate) noexcept
@@ -98,8 +97,8 @@ void TubeAmpEngine::updateFilters() noexcept
 
             // P.E.C. 6470000 Tonestack + Toroidal Inductor 8910000
             tsBass_.setLowShelf(sampleRate_, 55.0, 0.65, state_.bassDb);
-            const int mIdx = std::clamp(state_.midFreqIdx, 0, 2);
-            tsMid_.setBell(sampleRate_, kHeritageMidFreqs3[mIdx], 1.15, state_.midDb);
+            const int mIdx = std::clamp(state_.midFreqIdx, 0, 4);
+            tsMid_.setBell(sampleRate_, kMidFreqs5[mIdx], 1.15, state_.midDb);
             tsTreble_.setHighShelf(sampleRate_, 3200.0, 0.65, state_.trebleDb);
 
             // NFB loop 47k || 120pF
@@ -346,9 +345,7 @@ float TubeAmpEngine::evaluateCurveDb(const AmpControlState& st, double freqHz, d
         totalDb += BiquadFilter::getMagnitudeDbAtFrequency(BiquadFilter::makeHighShelf(sampleRate, 7000.0, 8.0, 0.707), freqHz, sampleRate);
 
     totalDb += BiquadFilter::getMagnitudeDbAtFrequency(BiquadFilter::makeLowShelf(sampleRate, 55.0, st.bassDb, 0.65), freqHz, sampleRate);
-    const double midF = (st.model == AmpModel::Heritage300)
-                            ? kHeritageMidFreqs3[std::clamp(st.midFreqIdx, 0, 2)]
-                            : kMidFreqs5[std::clamp(st.midFreqIdx, 0, 4)];
+    const double midF = kMidFreqs5[std::clamp(st.midFreqIdx, 0, 4)];
     totalDb += BiquadFilter::getMagnitudeDbAtFrequency(BiquadFilter::makePeakEQ(sampleRate, midF, st.midDb, 1.2), freqHz, sampleRate);
     totalDb += BiquadFilter::getMagnitudeDbAtFrequency(BiquadFilter::makeHighShelf(sampleRate, 3400.0, st.trebleDb, 0.65), freqHz, sampleRate);
 

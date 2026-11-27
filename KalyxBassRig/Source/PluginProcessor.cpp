@@ -263,6 +263,9 @@ void KalyxBassRigProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     pbSt.tapeDiv    = static_cast<int>(getF("fx_tape_div"));
     pbSt.tapeTimeMs = getF("fx_tape_time");
     pbSt.tapeRep    = getF("fx_tape_rep");
+    pbSt.tapeWow    = getF("fx_tape_wow");
+    pbSt.tapeFlutter= getF("fx_tape_flutter");
+    pbSt.tapeSat    = getF("fx_tape_sat");
     pbSt.tapeMix    = getF("fx_tape_mix");
 
     pbSt.eq4En     = getF("fx_eq4_en") > 0.5f;

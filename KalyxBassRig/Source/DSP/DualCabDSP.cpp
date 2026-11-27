@@ -271,13 +271,13 @@ void DualCabEngine::processBlock(const float* monoIn, float* outL, float* outR, 
         gainB = 1.0f;
     }
 
-    // Equal-power stereo pan for Cab A & Cab B
-    const float panAngleA = static_cast<float>((std::clamp(state_.panAPct / 100.0, -1.0, 1.0) + 1.0) * 0.7853981633974483);
-    const float panAngleB = static_cast<float>((std::clamp(state_.panBPct / 100.0, -1.0, 1.0) + 1.0) * 0.7853981633974483);
-    const float panAL = std::cos(panAngleA) * 1.41421356f;
-    const float panAR = std::sin(panAngleA) * 1.41421356f;
-    const float panBL = std::cos(panAngleB) * 1.41421356f;
-    const float panBR = std::sin(panAngleB) * 1.41421356f;
+    // Strict Constant Power Pan Law: panNorm in [0.0, 1.0] -> L = cos(pan * pi/2), R = sin(pan * pi/2)
+    const float panNormA = static_cast<float>(std::clamp((state_.panAPct + 100.0) * 0.005, 0.0, 1.0));
+    const float panNormB = static_cast<float>(std::clamp((state_.panBPct + 100.0) * 0.005, 0.0, 1.0));
+    const float panAL = std::cos(panNormA * 1.5707963267948966f);
+    const float panAR = std::sin(panNormA * 1.5707963267948966f);
+    const float panBL = std::cos(panNormB * 1.5707963267948966f);
+    const float panBR = std::sin(panNormB * 1.5707963267948966f);
 
     const float roomAmt = static_cast<float>(std::clamp(state_.roomPct / 100.0, 0.0, 1.0)) * 0.35f;
 

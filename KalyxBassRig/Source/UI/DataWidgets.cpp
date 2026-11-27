@@ -37,11 +37,15 @@ void KalyxRotaryControl::init(juce::Component& parent,
     titleLabel.setJustificationType(juce::Justification::centred);
     titleLabel.setColour(juce::Label::textColourId, isDarkText ? KalyxTheme::dayTextPrimary.withAlpha(0.75f)
                                                                : KalyxTheme::nightTextPrimary.withAlpha(0.75f));
+    if (infoHint.isNotEmpty())
+        titleLabel.setTooltip(infoHint);
     parent.addAndMakeVisible(titleLabel);
 
     valueLabel.setJustificationType(juce::Justification::centred);
     valueLabel.setEditable(false, true, false);
     valueLabel.setColour(juce::Label::textColourId, isDarkText ? KalyxTheme::dayTextPrimary : KalyxTheme::nightTextPrimary);
+    if (infoHint.isNotEmpty())
+        valueLabel.setTooltip(infoHint);
     valueLabel.onTextChange = [this]()
     {
         const double v = valueLabel.getText().getDoubleValue();
@@ -170,17 +174,25 @@ void TactileFaderBar::paint(juce::Graphics& g)
     g.setColour(bdCol.withAlpha(alpha));
     g.drawRoundedRectangle(r, 4.0f * sc, 1.0f * sc);
 
-    // Thick hardware recessed rail/track at the bottom half of the bar
-    const auto railR = juce::Rectangle<float>(r.getX() + 4.0f * sc, r.getBottom() - 8.5f * sc,
-                                              std::max(10.0f, r.getWidth() - 8.0f * sc), 6.0f * sc);
-    const auto railBg = darkText_ ? KalyxTheme::dayKnobTrackBg : KalyxTheme::nightChassisBg;
+    // Thick hardware recessed rail/track (min 14px * uiScale, #111318)
+    const bool splitLayout = (r.getHeight() >= 28.0f * sc);
+    const float railH = splitLayout ? std::max(14.0f * sc, r.getHeight() * 0.48f)
+                                    : std::max(14.0f * sc, r.getHeight() - 3.0f * sc);
+    const auto railR = splitLayout
+        ? juce::Rectangle<float>(r.getX() + 3.0f * sc, r.getBottom() - railH - 2.0f * sc,
+                                 std::max(10.0f, r.getWidth() - 6.0f * sc), railH)
+        : r.reduced(2.0f * sc, 1.5f * sc).withHeight(railH);
+
+    const auto railBg = darkText_ ? KalyxTheme::dayKnobTrackBg : juce::Colour(0xFF111318);
     g.setColour(railBg.withAlpha(alpha));
-    g.fillRoundedRectangle(railR, 2.5f * sc);
+    g.fillRoundedRectangle(railR, 3.0f * sc);
+    g.setColour(bdCol.withAlpha(0.65f * alpha));
+    g.drawRoundedRectangle(railR, 3.0f * sc, 0.8f * sc);
 
     if (param_ != nullptr)
     {
         const float norm = param_->convertTo0to1(static_cast<float>(currentVal_));
-        const auto fillCol = (dimmed_ ? juce::Colours::grey : accent_).withAlpha(alpha);
+        const auto fillCol = (dimmed_ ? juce::Colours::grey : accent_).withAlpha(0.88f * alpha);
         g.setColour(fillCol);
         float headX = railR.getX();
         if (bipolar_)
@@ -188,34 +200,37 @@ void TactileFaderBar::paint(juce::Graphics& g)
             const float cx = railR.getCentreX();
             const float vx = railR.getX() + norm * railR.getWidth();
             headX = vx;
-            const auto fillR = juce::Rectangle<float>(std::min(cx, vx), railR.getY(),
-                                                      std::max(2.0f, std::abs(vx - cx)), railR.getHeight());
+            const auto fillR = juce::Rectangle<float>(std::min(cx, vx), railR.getY() + 1.0f * sc,
+                                                      std::max(2.0f, std::abs(vx - cx)), std::max(4.0f, railR.getHeight() - 2.0f * sc));
             g.fillRoundedRectangle(fillR, 2.0f * sc);
-            g.setColour((darkText_ ? KalyxTheme::dayTextPrimary : KalyxTheme::nightTextPrimary).withAlpha(0.35f * alpha));
-            g.drawLine(cx, railR.getY() - 1.5f * sc, cx, railR.getBottom() + 1.5f * sc, 1.2f * sc);
+            g.setColour((darkText_ ? KalyxTheme::dayTextPrimary : KalyxTheme::nightTextPrimary).withAlpha(0.40f * alpha));
+            g.drawLine(cx, railR.getY(), cx, railR.getBottom(), 1.2f * sc);
         }
         else
         {
             const float fw = std::max(3.0f, norm * railR.getWidth());
             headX = railR.getX() + fw;
-            const auto fillR = railR.withWidth(fw);
+            const auto fillR = railR.reduced(0.0f, 1.0f * sc).withWidth(fw);
             g.fillRoundedRectangle(fillR, 2.0f * sc);
         }
 
         // Crisp thick head demarcation cap
-        g.setColour((darkText_ ? KalyxTheme::dayTextPrimary : KalyxTheme::nightTextPrimary).withAlpha(0.94f * alpha));
-        g.fillRoundedRectangle(headX - 2.2f * sc, railR.getY() - 2.0f * sc, 4.4f * sc, railR.getHeight() + 4.0f * sc, 1.5f * sc);
+        g.setColour((darkText_ ? KalyxTheme::dayTextPrimary : KalyxTheme::nightTextPrimary).withAlpha(0.95f * alpha));
+        g.fillRoundedRectangle(std::clamp(headX - 2.0f * sc, railR.getX(), railR.getRight() - 4.0f * sc),
+                               railR.getY() - 1.0f * sc, 4.0f * sc, railR.getHeight() + 2.0f * sc, 1.5f * sc);
     }
 
     const auto textCol = (darkText_ ? KalyxTheme::dayTextPrimary : KalyxTheme::nightTextPrimary).withAlpha(alpha);
-    const auto textArea = r.withTrimmedBottom(9.5f * sc).reduced(5.0f * sc, 0.0f);
-    g.setColour(textCol.withAlpha(0.82f * alpha));
+    const auto textArea = splitLayout
+        ? r.withBottom(railR.getY() - 1.0f * sc).reduced(5.0f * sc, 0.0f)
+        : railR.reduced(6.0f * sc, 0.0f);
+    g.setColour(textCol.withAlpha(0.88f * alpha));
     g.setFont(KalyxTheme::makeFont(9.5f * sc, juce::Font::bold));
     g.drawFittedText(title_, textArea.toNearestInt(), juce::Justification::centredLeft, 1);
 
     const juce::String valStr = getFormattedValue();
     g.setColour(textCol);
-    g.setFont(KalyxTheme::makeMonoFont(10.0f * sc, juce::Font::plain));
+    g.setFont(KalyxTheme::makeMonoFont(10.0f * sc, juce::Font::bold));
     g.drawFittedText(valStr, textArea.toNearestInt(), juce::Justification::centredRight, 1);
 }
 
@@ -665,9 +680,25 @@ void VectorPad2D::paint(juce::Graphics& g)
     g.setColour(accent_);
     g.fillEllipse(px - 4.0f * sc, py - 4.0f * sc, 8.0f * sc, 8.0f * sc);
 
-    g.setColour(tx.withAlpha(0.68f));
-    g.setFont(KalyxTheme::makeMonoFont(8.5f * sc, juce::Font::plain));
-    g.drawFittedText(labelX_ + " x " + labelY_, pad.toNearestInt(), juce::Justification::bottomLeft, 1);
+    g.setColour(tx.withAlpha(0.75f));
+    g.setFont(KalyxTheme::makeMonoFont(8.5f * sc, juce::Font::bold));
+    // Y axis (vertical up arrow + label at top-left)
+    const float ax = pad.getX() + 3.0f * sc;
+    const float ay = pad.getY() + 10.0f * sc;
+    g.drawLine(ax, ay, ax, ay - 7.0f * sc, 1.2f * sc);
+    g.drawLine(ax - 2.5f * sc, ay - 4.5f * sc, ax, ay - 7.0f * sc, 1.2f * sc);
+    g.drawLine(ax + 2.5f * sc, ay - 4.5f * sc, ax, ay - 7.0f * sc, 1.2f * sc);
+    g.drawFittedText(labelY_, pad.withTrimmedLeft(8.0f * sc).withHeight(12.0f * sc).toNearestInt(),
+                     juce::Justification::centredLeft, 1);
+
+    // X axis (label + horizontal right arrow at bottom-right)
+    const float bx = pad.getRight() - 2.0f * sc;
+    const float by = pad.getBottom() - 4.0f * sc;
+    g.drawLine(bx - 9.0f * sc, by, bx, by, 1.2f * sc);
+    g.drawLine(bx - 2.5f * sc, by - 2.5f * sc, bx, by, 1.2f * sc);
+    g.drawLine(bx - 2.5f * sc, by + 2.5f * sc, bx, by, 1.2f * sc);
+    g.drawFittedText(labelX_, pad.withTrimmedRight(13.0f * sc).withTop(pad.getBottom() - 12.0f * sc).toNearestInt(),
+                     juce::Justification::centredRight, 1);
 }
 
 void VectorPad2D::mouseDown(const juce::MouseEvent& e) { mouseDrag(e); }

@@ -211,6 +211,9 @@ enum class DICircuit
     addChoice("fx_tape_div", "Tape Sync Div", { "1/4", "1/8", "1/8D", "1/16" }, 2);
     addFloat("fx_tape_time", "Tape Time ms", 40.0f, 1200.0f, 320.0f, 1.0f);
     addFloat("fx_tape_rep", "Tape Repeats", 0.0f, 92.0f, 38.0f, 0.1f);
+    addFloat("fx_tape_wow", "Tape Wow", 0.0f, 100.0f, 25.0f, 0.1f);
+    addFloat("fx_tape_flutter", "Tape Flutter", 0.0f, 100.0f, 20.0f, 0.1f);
+    addFloat("fx_tape_sat", "Tape Saturation", 0.0f, 100.0f, 35.0f, 0.1f);
     addFloat("fx_tape_mix", "Tape Mix", 0.0f, 100.0f, 28.0f, 0.1f);
 
     // Pedal 9: Studio Bass EQ + Mono Maker

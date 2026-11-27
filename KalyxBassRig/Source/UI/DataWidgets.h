@@ -87,7 +87,8 @@ private:
     std::unique_ptr<juce::TextEditor> editor_;
 };
 
-class VerticalConsoleFader final : public juce::Component
+class VerticalConsoleFader final : public juce::Component,
+                                   public juce::SettableTooltipClient
 {
 public:
     VerticalConsoleFader() = default;
@@ -131,7 +132,8 @@ private:
     std::unique_ptr<juce::TextEditor> editor_;
 };
 
-class KalyxSegmentedPill final : public juce::Component
+class KalyxSegmentedPill final : public juce::Component,
+                                 public juce::SettableTooltipClient
 {
 public:
     KalyxSegmentedPill(juce::AudioProcessorValueTreeState& apvts,

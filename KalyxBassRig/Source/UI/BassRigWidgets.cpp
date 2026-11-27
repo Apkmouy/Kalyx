@@ -302,10 +302,28 @@ void DIFilterGraphWidget::mouseUp(const juce::MouseEvent&)
 // ==============================================================================
 // AmpToneEQGraphWidget (with THD/Bias Heatmap "Aura Réactive")
 // ==============================================================================
+namespace
+{
+constexpr const char* kAmpEqListenIds[] = {
+    "amp_mid_freq", "amp_bass", "amp_mid", "amp_treble",
+    "amp_ultra_lo", "amp_ultra_hi", "amp_bright",
+    "amp_model", "amp_boost", "amp_presence"
+};
+}
+
 AmpToneEQGraphWidget::AmpToneEQGraphWidget(KalyxBassRigProcessor& proc)
     : proc_(proc)
 {
     smoothedBinsDb_.fill(-100.0f);
+    for (const char* id : kAmpEqListenIds)
+        proc_.getAPVTS().addParameterListener(id, this);
+}
+
+AmpToneEQGraphWidget::~AmpToneEQGraphWidget()
+{
+    cancelPendingUpdate();
+    for (const char* id : kAmpEqListenIds)
+        proc_.getAPVTS().removeParameterListener(id, this);
 }
 
 void AmpToneEQGraphWidget::updateFFTFromProcessor() noexcept

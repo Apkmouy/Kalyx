@@ -20,7 +20,7 @@ public:
     [[nodiscard]] int getPedalId() const noexcept { return pedalId_; }
     void setUiScale(float s) noexcept;
     void setDarkText(bool dark) noexcept;
-    void setTelemetryGr(float grDb) noexcept { compGrDb_ = grDb; if (pedalId_ == 0) repaint(); }
+    void setTelemetryComp(float inDb, float grDb) noexcept { compInDb_ = inDb; compGrDb_ = grDb; if (pedalId_ == 0) repaint(); }
     void updateBypassVisuals();
 
     void paint(juce::Graphics& g) override;
@@ -38,6 +38,7 @@ private:
     float uiScale_  { 1.0f };
     bool  darkText_ { false };
     bool  isHovered_ { false };
+    float compInDb_ { -60.0f };
     float compGrDb_ { 0.0f };
     juce::Point<int> dragStart_;
 
@@ -88,7 +89,7 @@ public:
 
     void setUiScale(float s) noexcept;
     void setDarkText(bool dark) noexcept;
-    void setCompGrDb(float grDb) noexcept;
+    void setCompTelemetry(float inDb, float grDb) noexcept;
     void syncOrderFromAPVTS();
 
     void paint(juce::Graphics& g) override;

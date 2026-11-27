@@ -44,8 +44,8 @@ PedalCardComponent::PedalCardComponent(juce::AudioProcessorValueTreeState& apvts
             setTooltip(juce::String::fromUTF8("Octaver Poly/Sub : Générateur d'octaves inférieures (-1/-2) et supérieure (+1)."));
             bypassAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts_, "fx_oct_en", bypassBtn_);
             addBar("fx_oct_clean", "CLEAN", false, 70.0, fmtPct, juce::String::fromUTF8("Octaver Poly/Sub : Niveau du signal direct non traité."));
-            addBar("fx_oct_sub1", "SUB 1", false, 50.0, fmtPct, juce::String::fromUTF8("Octaver Poly/Sub : Règle le niveau de l'octave inférieure (-1 Oct)."));
-            addBar("fx_oct_sub2", "SUB 2", false, 20.0, fmtPct, juce::String::fromUTF8("Octaver Poly/Sub : Règle le niveau de la double sous-octave (-2 Oct)."));
+            addBar("fx_oct_sub1", "-1 OCT", false, 50.0, fmtPct, juce::String::fromUTF8("Octaver Poly/Sub : Règle le niveau de l'octave inférieure (-1 Oct)."));
+            addBar("fx_oct_sub2", "-2 OCT", false, 20.0, fmtPct, juce::String::fromUTF8("Octaver Poly/Sub : Règle le niveau de la double sous-octave (-2 Oct)."));
             addBar("fx_oct_up", "OCT UP", false, 0.0, fmtPct, juce::String::fromUTF8("Octaver Poly/Sub : Règle le niveau de l'octave supérieure (+1 Oct)."));
             break;
 
@@ -137,6 +137,9 @@ PedalCardComponent::PedalCardComponent(juce::AudioProcessorValueTreeState& apvts
             pad2d_ = std::make_unique<VectorPad2D>();
             pad2d_->init(*this, apvts_, "fx_tape_time", "fx_tape_rep", "TIME", "REPEATS", accent_, darkText_, 0.25f, 0.4f);
             pad2d_->setWantsKeyboardFocus(false);
+            addBar("fx_tape_wow", "WOW", false, 20.0, fmtPct, juce::String::fromUTF8("Tape Echo : Pleurage lent (Wow) du défilement de la bande."));
+            addBar("fx_tape_flutter", "FLUTTER", false, 15.0, fmtPct, juce::String::fromUTF8("Tape Echo : Scintillement rapide (Flutter) de la bande."));
+            addBar("fx_tape_sat", "TAPE SAT", false, 30.0, fmtPct, juce::String::fromUTF8("Tape Echo : Saturation magnétique ADAA de la bande."));
             addBar("fx_tape_mix", "MIX", false, 28.0, fmtPct, juce::String::fromUTF8("Tape Echo : Dosage des répétitions dans le mix final."));
             break;
 
@@ -264,6 +267,19 @@ void PedalCardComponent::paint(juce::Graphics& g)
         g.setColour(accent_.withAlpha(cardAlpha));
         g.strokePath(tp, juce::PathStrokeType(1.8f * sc));
 
+        // Real-time luminous input/GR dot on transfer curve
+        if (on && compInDb_ > -47.5f)
+        {
+            const float xDot = std::clamp((compInDb_ + 48.0f) / 48.0f, 0.0f, 1.0f);
+            const float yDot = std::clamp((compInDb_ + compGrDb_ + 48.0f) / 48.0f, 0.0f, 1.0f);
+            const float dx = plot.getX() + xDot * plot.getWidth();
+            const float dy = plot.getBottom() - yDot * plot.getHeight();
+            g.setColour(accent_.withAlpha(0.32f));
+            g.fillEllipse(dx - 6.0f * sc, dy - 6.0f * sc, 12.0f * sc, 12.0f * sc);
+            g.setColour(juce::Colours::white);
+            g.fillEllipse(dx - 2.6f * sc, dy - 2.6f * sc, 5.2f * sc, 5.2f * sc);
+        }
+
         // Horizontal GR Bargraph (-20 dB to 0 dB)
         g.setColour((darkText_ ? KalyxTheme::dayControlIdleBg : KalyxTheme::nightChassisBg).withAlpha(cardAlpha));
         g.fillRoundedRectangle(grBarR, 3.0f * sc);
@@ -285,12 +301,12 @@ void PedalCardComponent::resized()
 {
     const float sc = uiScale_;
     auto r = getLocalBounds().reduced(static_cast<int>(6.0f * sc));
-    auto top = r.removeFromTop(static_cast<int>(22.0f * sc));
-    bypassBtn_.setBounds(top.removeFromRight(static_cast<int>(48.0f * sc)).reduced(0, 1));
-    r.removeFromTop(static_cast<int>(4.0f * sc));
+    auto top = r.removeFromTop(static_cast<int>(26.0f * sc));
+    bypassBtn_.setBounds(top.removeFromRight(static_cast<int>(64.0f * sc)).reduced(0, 1));
+    r.removeFromTop(static_cast<int>(3.0f * sc));
 
     if (pedalId_ == fx::Pedal_OptoFetComp)
-        r.removeFromTop(static_cast<int>(68.0f * sc));
+        r.removeFromTop(static_cast<int>(66.0f * sc));
 
     // Equidistant FlexBox layout for all controls inside the pedal card
     juce::FlexBox fb;
@@ -300,9 +316,9 @@ void PedalCardComponent::resized()
 
     if (syncBtn_ != nullptr && pill_ != nullptr)
     {
-        auto syncRow = r.removeFromTop(static_cast<int>(22.0f * sc));
-        syncBtn_->setBounds(syncRow.removeFromLeft(static_cast<int>(54.0f * sc)));
-        syncRow.removeFromLeft(4);
+        auto syncRow = r.removeFromTop(static_cast<int>(24.0f * sc));
+        syncBtn_->setBounds(syncRow.removeFromLeft(static_cast<int>(62.0f * sc)));
+        syncRow.removeFromLeft(static_cast<int>(4.0f * sc));
         pill_->setBounds(syncRow);
         r.removeFromTop(static_cast<int>(4.0f * sc));
     }
@@ -472,9 +488,9 @@ void PedalboardView::setDarkText(bool dark) noexcept
     repaint();
 }
 
-void PedalboardView::setCompGrDb(float grDb) noexcept
+void PedalboardView::setCompTelemetry(float inDb, float grDb) noexcept
 {
-    if (cards_[0]) cards_[0]->setTelemetryGr(grDb);
+    if (cards_[0]) cards_[0]->setTelemetryComp(inDb, grDb);
 }
 
 void PedalboardView::syncOrderFromAPVTS()

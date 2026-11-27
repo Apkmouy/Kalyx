@@ -226,22 +226,33 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
         return (v < 0 ? "L" : "R") + juce::String(std::abs(v), 0);
     };
 
-    gainKnob_.init(*this, apvts, "amp_gain", "GAIN", KalyxTheme::heritageBlue, false, dark, 42.0, fmtPct);
-    bassKnob_.init(*this, apvts, "amp_bass", "BASS", KalyxTheme::heritageBlue, true, dark, 0.0, fmtDb);
-    midKnob_.init(*this, apvts, "amp_mid", "MID", KalyxTheme::heritageBlue, true, dark, 0.0, fmtDb);
-    trebleKnob_.init(*this, apvts, "amp_treble", "TREBLE", KalyxTheme::heritageBlue, true, dark, 0.0, fmtDb);
-    driveKnob_.init(*this, apvts, "amp_drive", "DRIVE", KalyxTheme::classicAmber, false, dark, 25.0, fmtPct);
-    compBoostKnob_.init(*this, apvts, "amp_comp", "COMP", KalyxTheme::hybridCyan, false, dark, 20.0, fmtPct);
-    presenceKnob_.init(*this, apvts, "amp_presence", "PRESENCE", KalyxTheme::tangerineOrange, false, dark, 35.0, fmtPct);
-    masterKnob_.init(*this, apvts, "amp_master", "MASTER", KalyxTheme::heritageBlue, false, dark, 65.0, fmtPct);
+    gainKnob_.init(*this, apvts, "amp_gain", "GAIN", KalyxTheme::heritageBlue, false, dark, 42.0, fmtPct,
+                   juce::String::fromUTF8("Gain d'entrée du préampli à lampes (sature l'étage de gain)."));
+    bassKnob_.init(*this, apvts, "amp_bass", "BASS", KalyxTheme::heritageBlue, true, dark, 0.0, fmtDb,
+                   juce::String::fromUTF8("Égaliseur graves du Tone Stack de l'ampli."));
+    midKnob_.init(*this, apvts, "amp_mid", "MID", KalyxTheme::heritageBlue, true, dark, 0.0, fmtDb,
+                  juce::String::fromUTF8("Égaliseur médiums du Tone Stack (fréquence sélectionnable)."));
+    trebleKnob_.init(*this, apvts, "amp_treble", "TREBLE", KalyxTheme::heritageBlue, true, dark, 0.0, fmtDb,
+                     juce::String::fromUTF8("Égaliseur aigus du Tone Stack de l'ampli."));
+    driveKnob_.init(*this, apvts, "amp_drive", "DRIVE", KalyxTheme::classicAmber, false, dark, 25.0, fmtPct,
+                    juce::String::fromUTF8("Saturation harmonique de l'étage de puissance / Drive."));
+    compBoostKnob_.init(*this, apvts, "amp_comp", "COMP", KalyxTheme::hybridCyan, false, dark, 20.0, fmtPct,
+                        juce::String::fromUTF8("Compresseur / Boost intégré de la tête d'ampli."));
+    presenceKnob_.init(*this, apvts, "amp_presence", "PRESENCE", KalyxTheme::tangerineOrange, false, dark, 35.0, fmtPct,
+                       juce::String::fromUTF8("Contrôle de présence hautes fréquences (contre-réaction)."));
+    masterKnob_.init(*this, apvts, "amp_master", "MASTER", KalyxTheme::heritageBlue, false, dark, 65.0, fmtPct,
+                     juce::String::fromUTF8("Volume maître de sortie de la tête d'ampli."));
 
-    sagBar_.init(*this, apvts, "amp_sag", "POWER SAG (660V)", KalyxTheme::classicAmber, false, dark, 30.0, fmtPct);
+    sagBar_.init(*this, apvts, "amp_sag", "POWER SAG (660V)", KalyxTheme::classicAmber, false, dark, 30.0, fmtPct,
+                 juce::String::fromUTF8("Affaissement dynamique de l'alimentation haute tension (660V)."));
     biasBar_.init(*this, apvts, "amp_bias", "TUBE BIAS", KalyxTheme::kalyxAubergine, true, dark, 0.0,
-                 [](double v) { return (v >= 0.5 ? "+" : "") + juce::String(v, 0) + "%"; });
+                 [](double v) { return (v >= 0.5 ? "+" : "") + juce::String(v, 0) + "%"; },
+                 juce::String::fromUTF8("Polarisation des lampes de puissance (asymétrie paire/impaire)."));
 
     // Center Bottom: Dual Cabinet IR
     cabEnBtn_.setClickingTogglesState(true);
     cabEnBtn_.setWantsKeyboardFocus(false);
+    cabEnBtn_.setTooltip(juce::String::fromUTF8("Active ou contourne (Bypass) le module Dual Cabinet IR."));
     cabEnAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "cab_en", cabEnBtn_);
     addAndMakeVisible(cabEnBtn_);
 
@@ -258,6 +269,8 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
     }
     cabABox_.setWantsKeyboardFocus(false);
     cabBBox_.setWantsKeyboardFocus(false);
+    cabABox_.setTooltip(juce::String::fromUTF8("Sélectionne la réponse impulsionnelle (IR) du baffle A."));
+    cabBBox_.setTooltip(juce::String::fromUTF8("Sélectionne la réponse impulsionnelle (IR) du baffle B."));
     cabAAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, "cab_a_ir", cabABox_);
     cabBAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, "cab_b_ir", cabBBox_);
     addAndMakeVisible(cabABox_);
@@ -269,6 +282,14 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
         b->setWantsKeyboardFocus(false);
         addAndMakeVisible(b);
     }
+    phaseABtn_.setTooltip(juce::String::fromUTF8("Inverse la polarité (phase 180°) du baffle A."));
+    phaseBBtn_.setTooltip(juce::String::fromUTF8("Inverse la polarité (phase 180°) du baffle B."));
+    muteABtn_.setTooltip(juce::String::fromUTF8("Coupe le son (Mute) du baffle A."));
+    soloABtn_.setTooltip(juce::String::fromUTF8("Isole (Solo) le baffle A."));
+    muteBBtn_.setTooltip(juce::String::fromUTF8("Coupe le son (Mute) du baffle B."));
+    soloBBtn_.setTooltip(juce::String::fromUTF8("Isole (Solo) le baffle B."));
+    cabAutoPhaseBtn_.setTooltip(juce::String::fromUTF8("Alignement automatique de phase entre Cab A et Cab B."));
+
     phaseAAtt_       = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "cab_a_phase", phaseABtn_);
     muteAAtt_        = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "cab_a_mute", muteABtn_);
     soloAAtt_        = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "cab_a_solo", soloABtn_);
@@ -278,12 +299,14 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
     cabAutoPhaseAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "cab_auto_phase", cabAutoPhaseBtn_);
 
     cabAPanBar_.init(*this, apvts, "cab_a_pan", "PAN", KalyxTheme::kalyxRoyalBlue, true, dark, 0.0, fmtPan,
-                     juce::String::fromUTF8("Panoramique stéréo du baffle A."));
+                     juce::String::fromUTF8("Panoramique stéréo (Constant Power) du baffle A."));
     cabBPanBar_.init(*this, apvts, "cab_b_pan", "PAN", KalyxTheme::kalyxAubergine, true, dark, 0.0, fmtPan,
-                     juce::String::fromUTF8("Panoramique stéréo du baffle B."));
+                     juce::String::fromUTF8("Panoramique stéréo (Constant Power) du baffle B."));
 
     loadIrABtn_.setWantsKeyboardFocus(false);
     loadIrBBtn_.setWantsKeyboardFocus(false);
+    loadIrABtn_.setTooltip(juce::String::fromUTF8("Charge un fichier IR WAV personnalisé pour le baffle A."));
+    loadIrBBtn_.setTooltip(juce::String::fromUTF8("Charge un fichier IR WAV personnalisé pour le baffle B."));
     loadIrABtn_.onClick = [this]() { openCustomIRChooser(0); };
     loadIrBBtn_.onClick = [this]() { openCustomIRChooser(1); };
     addAndMakeVisible(loadIrABtn_);
@@ -292,29 +315,39 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
     cabMixBar_.init(*this, apvts, "cab_mix", "CAB A <-> B (EQ PWR)", KalyxTheme::kalyxRoyalBlue, false, dark, 35.0,
                     [](double v) { return juce::String(100.0 - v, 0) + "/" + juce::String(v, 0); },
                     juce::String::fromUTF8("Balance Equal Power (cos/sin) entre Cab A et Cab B."));
-    cabBreakupBar_.init(*this, apvts, "cab_breakup", "CONE BREAKUP", KalyxTheme::classicAmber, false, dark, 18.0, fmtPct);
-    cabRoomBar_.init(*this, apvts, "cab_room", "ROOM", KalyxTheme::kalyxAubergine, false, dark, 15.0, fmtPct);
+    cabBreakupBar_.init(*this, apvts, "cab_breakup", "CONE BREAKUP", KalyxTheme::classicAmber, false, dark, 18.0, fmtPct,
+                        juce::String::fromUTF8("Saturation mécanique non-linéaire des haut-parleurs."));
+    cabRoomBar_.init(*this, apvts, "cab_room", "ROOM", KalyxTheme::kalyxAubergine, false, dark, 15.0, fmtPct,
+                     juce::String::fromUTF8("Ambiance de pièce d'enregistrement (Early Reflections)."));
 
     // Right Column: Master & Mixer (Official Kalyx Palette)
     addAndMakeVisible(vuMeter_);
     vuModePill_ = std::make_unique<kalyx::bass::ui::KalyxSegmentedPill>(
         apvts, "vu_mode", "", juce::StringArray { "IN", "OUT", "GR" }, KalyxTheme::kalyxRoyalBlue, dark);
+    vuModePill_->setTooltip(juce::String::fromUTF8("Sélectionne la source du VU-Mètre : Entrée, Sortie ou Gain Reduction."));
     addAndMakeVisible(*vuModePill_);
     addAndMakeVisible(phaseCorrBar_);
 
     ampLevelFader_.init(*this, apvts, "amp_level", "AMP", KalyxTheme::kalyxRoyalBlue, dark, -60.0, 12.0, 0.0);
+    ampLevelFader_.setTooltip(juce::String::fromUTF8("Niveau de la voie Ampli + Baffle dans le mix final."));
     diLevelFader_.init(*this, apvts, "di_level", "DI", KalyxTheme::kalyxAubergine, dark, -60.0, 12.0, -6.0);
+    diLevelFader_.setTooltip(juce::String::fromUTF8("Niveau de la voie DI parallèle dans le mix final."));
     outFader_.init(*this, apvts, "out_fader", "OUT", KalyxTheme::classicAmber, dark, -60.0, 12.0, 0.0);
+    outFader_.setTooltip(juce::String::fromUTF8("Niveau de sortie Master global du plugin."));
 
     kickEnBtn_.setClickingTogglesState(true);
     limEnBtn_.setClickingTogglesState(true);
+    kickEnBtn_.setTooltip(juce::String::fromUTF8("Active le Kick-Drum Dynamic Relief (sidechain interne)."));
+    limEnBtn_.setTooltip(juce::String::fromUTF8("Active le limiteur Master True-Peak en fin de chaîne."));
     kickEnAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "kick_relief_en", kickEnBtn_);
     limEnAtt_  = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "lim_en", limEnBtn_);
     addAndMakeVisible(kickEnBtn_);
     addAndMakeVisible(limEnBtn_);
 
-    kickAmtBar_.init(*this, apvts, "kick_relief_amt", "KICK DUCK", KalyxTheme::kalyxAubergine, false, dark, 45.0, fmtPct);
-    limCeilBar_.init(*this, apvts, "lim_ceiling", "CEILING", KalyxTheme::alertRed, false, dark, -0.3, fmtDb);
+    kickAmtBar_.init(*this, apvts, "kick_relief_amt", "KICK DUCK", KalyxTheme::kalyxAubergine, false, dark, 45.0, fmtPct,
+                     juce::String::fromUTF8("Intensité du ducking dynamique pour laisser passer la grosse caisse."));
+    limCeilBar_.init(*this, apvts, "lim_ceiling", "CEILING", KalyxTheme::alertRed, false, dark, -0.3, fmtDb,
+                     juce::String::fromUTF8("Plafond maximal (dBFS) du limiteur de sortie."));
 
     addChildComponent(pedalboardView_);
     addChildComponent(tunerOverlay_);
@@ -431,7 +464,7 @@ void KalyxBassRigEditor::timerCallback()
     ampGraph_.updateFFTFromProcessor();
     ampGraph_.repaint();
     phaseCorrBar_.setCorrelation(proc_.getPhaseCorr());
-    pedalboardView_.setCompGrDb(proc_.getPedalCompGrDb());
+    pedalboardView_.setCompTelemetry(proc_.getPedalCompInDb(), proc_.getPedalCompGrDb());
 
     if (auto* p = proc_.getAPVTS().getRawParameterValue("vu_mode"))
         vuMeter_.setMode(static_cast<int>(p->load(std::memory_order_relaxed)));

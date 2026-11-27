@@ -55,6 +55,7 @@ public:
     [[nodiscard]] float getAmpSag()    const noexcept { return ampEngine_.getSagVoltsDrop(); }
     [[nodiscard]] float getDIGrDb()    const noexcept { return diEngine_.getOptoGrDb(); }
     [[nodiscard]] float getLimGrDb()   const noexcept { return limiter_.getGrDb(); }
+    [[nodiscard]] float getPedalCompInDb() const noexcept { return pedalboard_.getCompInDb(); }
     [[nodiscard]] float getPedalCompGrDb() const noexcept { return pedalboard_.getCompGrDb(); }
     [[nodiscard]] float getGateGain()  const noexcept { return gate_.getGateGain(); }
     [[nodiscard]] float getKickDuck()  const noexcept { return kickRelief_.getDuckDb(); }
