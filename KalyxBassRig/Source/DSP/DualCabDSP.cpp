@@ -253,23 +253,8 @@ void DualCabEngine::processBlock(const float* monoIn, float* outL, float* outR, 
     const float polA = state_.phaseA ? -1.0f : 1.0f;
     const float polB = state_.phaseB ? -1.0f : 1.0f;
 
-    float gainA = 0.0f;
-    float gainB = 0.0f;
-    if (runA && runB)
-    {
-        // Equal Power (Constant Power) Crossfade: cos / sin
-        const float theta = static_cast<float>(std::clamp(state_.mixPct / 100.0, 0.0, 1.0) * 1.5707963267948966);
-        gainA = std::cos(theta);
-        gainB = std::sin(theta);
-    }
-    else if (runA)
-    {
-        gainA = 1.0f;
-    }
-    else if (runB)
-    {
-        gainB = 1.0f;
-    }
+    const float gainA = runA ? std::pow(10.0f, static_cast<float>(std::clamp(state_.levelADb, -48.0, 12.0)) / 20.0f) : 0.0f;
+    const float gainB = runB ? std::pow(10.0f, static_cast<float>(std::clamp(state_.levelBDb, -48.0, 12.0)) / 20.0f) : 0.0f;
 
     // Strict Constant Power Pan Law: panNorm in [0.0, 1.0] -> L = cos(pan * pi/2), R = sin(pan * pi/2)
     const float panNormA = static_cast<float>(std::clamp((state_.panAPct + 100.0) * 0.005, 0.0, 1.0));

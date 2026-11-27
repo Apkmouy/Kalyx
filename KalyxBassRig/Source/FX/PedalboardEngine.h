@@ -33,17 +33,17 @@ struct HostSyncInfo
 struct PedalboardState
 {
     // 0: Opto/FET Comp
-    bool   compEn { false }; int compMode { 0 }; double compAmt { 40.0 }; double compBlend { 75.0 };
+    bool   compEn { false }; int compMode { 0 }; double compIn { 50.0 }; double compAmt { 40.0 }; double compBlend { 75.0 }; double compMakeupDb { 0.0 };
     // 1: Octaver
     bool   octEn { false }; double octClean { 70.0 }; double octSub1 { 50.0 }; double octSub2 { 20.0 }; double octUp { 0.0 };
     // 2: Env Filter
     bool   envEn { false }; double envSens { 55.0 }; double envAtt { 8.0 }; double envDec { 180.0 }; double envQ { 3.5 };
     // 3: Transparent Drive
-    bool   tdrvEn { false }; double tdrvDrv { 45.0 }; double tdrvTone { 55.0 }; double tdrvBlend { 50.0 };
+    bool   tdrvEn { false }; double tdrvDrv { 45.0 }; double tdrvTone { 55.0 }; double tdrvBlend { 50.0 }; double tdrvLvlDb { 0.0 };
     // 4: Rodent Bass
-    bool   ratEn { false }; double ratDist { 50.0 }; double ratFlt { 40.0 }; double ratBlend { 35.0 };
+    bool   ratEn { false }; double ratDist { 50.0 }; double ratFlt { 40.0 }; double ratBlend { 35.0 }; double ratLvlDb { 0.0 };
     // 5: Big Wall Fuzz
-    bool   fuzzEn { false }; double fuzzSust { 65.0 }; double fuzzTilt { 0.0 }; double fuzzLow { 45.0 };
+    bool   fuzzEn { false }; double fuzzSust { 65.0 }; double fuzzTilt { 0.0 }; double fuzzLow { 45.0 }; double fuzzLvlDb { 0.0 };
     // 6: Dimension Chorus
     bool   choEn { false }; double choRate { 0.8 }; double choDepth { 45.0 }; double choMix { 40.0 };
     // 7: Analog Phaser

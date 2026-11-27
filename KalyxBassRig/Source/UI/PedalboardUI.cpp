@@ -34,8 +34,10 @@ PedalCardComponent::PedalCardComponent(juce::AudioProcessorValueTreeState& apvts
             pill_ = std::make_unique<KalyxSegmentedPill>(apvts_, "fx_comp_mode", "", juce::StringArray { "OPTO", "FET" }, accent_, darkText_);
             pill_->setWantsKeyboardFocus(false);
             addAndMakeVisible(*pill_);
-            addBar("fx_comp_amt", "COMP", false, 40.0, fmtPct, juce::String::fromUTF8("Opto / FET Comp : Taux de compression appliqué au signal."));
+            addBar("fx_comp_in", "INPUT", false, 50.0, fmtPct, juce::String::fromUTF8("Opto / FET Comp : Sensibilité d'entrée (+0 à +24 dB) avant le détecteur."));
+            addBar("fx_comp_amt", "COMP", false, 40.0, fmtPct, juce::String::fromUTF8("Opto / FET Comp : Seuil (-6 à -60 dBFS) et taux de compression."));
             addBar("fx_comp_blend", "BLEND", false, 75.0, fmtPct, juce::String::fromUTF8("Opto / FET Comp : Dosage parallèle entre signal sec et compressé."));
+            addBar("fx_comp_makeup", "MAKEUP", true, 0.0, fmtDb, juce::String::fromUTF8("Opto / FET Comp : Gain compensatoire en sortie (-24 à +24 dB)."));
             break;
 
         case fx::Pedal_Octaver:
@@ -68,6 +70,7 @@ PedalCardComponent::PedalCardComponent(juce::AudioProcessorValueTreeState& apvts
             addBar("fx_tdrv_drv", "DRIVE", false, 45.0, fmtPct, juce::String::fromUTF8("Transparent Drive : Saturation harmonique asymétrique."));
             addBar("fx_tdrv_tone", "TONE", false, 55.0, fmtPct, juce::String::fromUTF8("Transparent Drive : Brillance de l'étage de saturation."));
             addBar("fx_tdrv_blend", "DRY BLEND", false, 50.0, fmtPct, juce::String::fromUTF8("Transparent Drive : Mélange avec la basse claire pour préserver l'attaque."));
+            addBar("fx_tdrv_lvl", "LEVEL", true, 0.0, fmtDb, juce::String::fromUTF8("Transparent Drive : Niveau de sortie du circuit saturé (-24 à +24 dB)."));
             break;
 
         case fx::Pedal_RodentBass:
@@ -78,6 +81,7 @@ PedalCardComponent::PedalCardComponent(juce::AudioProcessorValueTreeState& apvts
             addBar("fx_rat_dist", "DIST", false, 50.0, fmtPct, juce::String::fromUTF8("Rodent Bass : Taux de distorsion rocailleuse."));
             addBar("fx_rat_flt", "FILTER", false, 40.0, fmtPct, juce::String::fromUTF8("Rodent Bass : Coupe-haut inversé (plus élevé = plus sombre)."));
             addBar("fx_rat_blend", "CLEAN", false, 35.0, fmtPct, juce::String::fromUTF8("Rodent Bass : Réinjection du signal grave non saturé."));
+            addBar("fx_rat_lvl", "LEVEL", true, 0.0, fmtDb, juce::String::fromUTF8("Rodent Bass : Niveau de sortie du circuit saturé (-24 à +24 dB)."));
             break;
 
         case fx::Pedal_BigWallFuzz:
@@ -88,6 +92,7 @@ PedalCardComponent::PedalCardComponent(juce::AudioProcessorValueTreeState& apvts
             addBar("fx_fuzz_sust", "SUSTAIN", false, 65.0, fmtPct, juce::String::fromUTF8("Big Wall Fuzz : Saturation extrême et sustain infini."));
             addBar("fx_fuzz_tilt", "TILT", true, 0.0, [](double v) { return juce::String(v, 0); }, juce::String::fromUTF8("Big Wall Fuzz : Balance spectrale Tilt (graves vs aigus)."));
             addBar("fx_fuzz_low", "LOW REC", false, 45.0, fmtPct, juce::String::fromUTF8("Big Wall Fuzz : Récupération du bas du spectre sous 85 Hz."));
+            addBar("fx_fuzz_lvl", "LEVEL", true, 0.0, fmtDb, juce::String::fromUTF8("Big Wall Fuzz : Niveau de sortie compensatoire (-24 à +24 dB)."));
             break;
 
         case fx::Pedal_DimChorus:
@@ -236,9 +241,10 @@ void PedalCardComponent::paint(juce::Graphics& g)
 
         const bool isFet = apvts_.getRawParameterValue("fx_comp_mode")->load() > 0.5f;
         const float amt  = apvts_.getRawParameterValue("fx_comp_amt")->load() / 100.0f;
-        const float threshNorm = 0.80f - 0.55f * amt;
+        const float threshDb = -6.0f - 54.0f * amt;
+        const float threshNorm = std::clamp((threshDb + 60.0f) / 60.0f, 0.0f, 1.0f);
         const float ratio = isFet ? 8.0f : 3.5f;
-        const float knee  = isFet ? 0.04f : 0.16f;
+        const float knee  = isFet ? 0.04f : 0.14f;
 
         juce::Path tp;
         const auto plot = curveR.reduced(4.0f * sc);
@@ -267,11 +273,11 @@ void PedalCardComponent::paint(juce::Graphics& g)
         g.setColour(accent_.withAlpha(cardAlpha));
         g.strokePath(tp, juce::PathStrokeType(1.8f * sc));
 
-        // Real-time luminous input/GR dot on transfer curve
-        if (on && compInDb_ > -47.5f)
+        // Real-time luminous input/GR dot on transfer curve (-60..0 dBFS)
+        if (on && compInDb_ > -59.5f)
         {
-            const float xDot = std::clamp((compInDb_ + 48.0f) / 48.0f, 0.0f, 1.0f);
-            const float yDot = std::clamp((compInDb_ + compGrDb_ + 48.0f) / 48.0f, 0.0f, 1.0f);
+            const float xDot = std::clamp((compInDb_ + 60.0f) / 60.0f, 0.0f, 1.0f);
+            const float yDot = std::clamp((compInDb_ + compGrDb_ + 60.0f) / 60.0f, 0.0f, 1.0f);
             const float dx = plot.getX() + xDot * plot.getWidth();
             const float dy = plot.getBottom() - yDot * plot.getHeight();
             g.setColour(accent_.withAlpha(0.32f));
@@ -311,7 +317,7 @@ void PedalCardComponent::resized()
     // Equidistant FlexBox layout for all controls inside the pedal card
     juce::FlexBox fb;
     fb.flexDirection  = juce::FlexBox::Direction::column;
-    fb.justifyContent = juce::FlexBox::JustifyContent::spaceBetween;
+    fb.justifyContent = juce::FlexBox::JustifyContent::spaceAround;
     fb.alignItems     = juce::FlexBox::AlignItems::stretch;
 
     if (syncBtn_ != nullptr && pill_ != nullptr)
@@ -324,14 +330,14 @@ void PedalCardComponent::resized()
     }
     else if (pill_ != nullptr)
     {
-        fb.items.add(juce::FlexItem(*pill_).withHeight(22.0f * sc));
+        fb.items.add(juce::FlexItem(*pill_).withHeight(20.0f * sc));
     }
 
     if (pad2d_ != nullptr)
-        fb.items.add(juce::FlexItem(*pad2d_).withFlex(1.3f).withMinHeight(44.0f * sc).withMargin({ 2.0f * sc, 0.0f, 2.0f * sc, 0.0f }));
+        fb.items.add(juce::FlexItem(*pad2d_).withFlex(1.3f).withMinHeight(42.0f * sc).withMargin({ 1.5f * sc, 0.0f, 1.5f * sc, 0.0f }));
 
     for (auto& b : bars_)
-        fb.items.add(juce::FlexItem(*b).withFlex(1.0f).withMinHeight(24.0f * sc).withMaxHeight(32.0f * sc).withMargin({ 2.0f * sc, 0.0f, 2.0f * sc, 0.0f }));
+        fb.items.add(juce::FlexItem(*b).withFlex(1.0f).withMinHeight(20.0f * sc).withMaxHeight(32.0f * sc).withMargin({ 1.5f * sc, 0.0f, 1.5f * sc, 0.0f }));
 
     fb.performLayout(r);
 }

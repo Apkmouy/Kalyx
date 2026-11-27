@@ -32,7 +32,8 @@ struct CabControlState
     bool    muteB        { false };
     bool    soloB        { false };
     double  panBPct      { 0.0 };  // -100..+100
-    double  mixPct       { 35.0 }; // 0=100% A, 100=100% B
+    double  levelADb     { 0.0 };  // -48..+12 dB
+    double  levelBDb     { 0.0 };  // -48..+12 dB
     bool    autoPhase    { true };
     double  breakupPct   { 18.0 }; // Speaker Excursion / Breakup
     double  roomPct      { 15.0 }; // 0..100

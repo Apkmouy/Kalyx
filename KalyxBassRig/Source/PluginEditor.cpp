@@ -312,9 +312,10 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
     addAndMakeVisible(loadIrABtn_);
     addAndMakeVisible(loadIrBBtn_);
 
-    cabMixBar_.init(*this, apvts, "cab_mix", "CAB A <-> B (EQ PWR)", KalyxTheme::kalyxRoyalBlue, false, dark, 35.0,
-                    [](double v) { return juce::String(100.0 - v, 0) + "/" + juce::String(v, 0); },
-                    juce::String::fromUTF8("Balance Equal Power (cos/sin) entre Cab A et Cab B."));
+    cabALevelBar_.init(*this, apvts, "cab_a_level", "CAB A LEVEL", KalyxTheme::kalyxRoyalBlue, false, dark, 0.0, fmtDb,
+                       juce::String::fromUTF8("Volume individuel du baffle A (-48 dB à +12 dB) avant sommation."));
+    cabBLevelBar_.init(*this, apvts, "cab_b_level", "CAB B LEVEL", KalyxTheme::kalyxAubergine, false, dark, 0.0, fmtDb,
+                       juce::String::fromUTF8("Volume individuel du baffle B (-48 dB à +12 dB) avant sommation."));
     cabBreakupBar_.init(*this, apvts, "cab_breakup", "CONE BREAKUP", KalyxTheme::classicAmber, false, dark, 18.0, fmtPct,
                         juce::String::fromUTF8("Saturation mécanique non-linéaire des haut-parleurs."));
     cabRoomBar_.init(*this, apvts, "cab_room", "ROOM", KalyxTheme::kalyxAubergine, false, dark, 15.0, fmtPct,
@@ -512,7 +513,8 @@ void KalyxBassRigEditor::applyTheme()
     biasBar_.setThemeColours(KalyxTheme::getPrimary(theme_), dark);
     cabAPanBar_.setThemeColours(KalyxTheme::getAccent(theme_), dark);
     cabBPanBar_.setThemeColours(KalyxTheme::getPrimary(theme_), dark);
-    cabMixBar_.setThemeColours(KalyxTheme::getAccent(theme_), dark);
+    cabALevelBar_.setThemeColours(KalyxTheme::kalyxRoyalBlue, dark);
+    cabBLevelBar_.setThemeColours(KalyxTheme::kalyxAubergine, dark);
     cabBreakupBar_.setThemeColours(KalyxTheme::classicAmber, dark);
     cabRoomBar_.setThemeColours(KalyxTheme::getPrimary(theme_), dark);
     ampLevelFader_.setThemeColours(KalyxTheme::getAccent(theme_), dark);
@@ -675,7 +677,8 @@ void KalyxBassRigEditor::resized()
     biasBar_.setUiScale(sc);
     cabAPanBar_.setUiScale(sc);
     cabBPanBar_.setUiScale(sc);
-    cabMixBar_.setUiScale(sc);
+    cabALevelBar_.setUiScale(sc);
+    cabBLevelBar_.setUiScale(sc);
     cabBreakupBar_.setUiScale(sc);
     cabRoomBar_.setUiScale(sc);
     vuMeter_.setUiScale(sc);
@@ -850,10 +853,13 @@ void KalyxBassRigEditor::resized()
     layoutCabRow(cabABox_, muteABtn_, soloABtn_, phaseABtn_, cabAPanBar_, loadIrABtn_);
     layoutCabRow(cabBBox_, muteBBtn_, soloBBtn_, phaseBBtn_, cabBPanBar_, loadIrBBtn_);
 
-    cabR.removeFromTop(static_cast<int>(10.0f * sc));
-    const int cabBarH = static_cast<int>(24.0f * sc);
-    cabMixBar_.setBounds(cabR.removeFromTop(cabBarH));
     cabR.removeFromTop(static_cast<int>(6.0f * sc));
+    const int cabBarH = std::min(static_cast<int>(24.0f * sc),
+                                 std::max(18, (cabR.getHeight() - static_cast<int>(10.0f * sc)) / 3));
+    cabALevelBar_.setBounds(cabR.removeFromTop(cabBarH));
+    cabR.removeFromTop(static_cast<int>(4.0f * sc));
+    cabBLevelBar_.setBounds(cabR.removeFromTop(cabBarH));
+    cabR.removeFromTop(static_cast<int>(5.0f * sc));
     auto cabBottomRow = cabR.removeFromTop(cabBarH);
     cabBreakupBar_.setBounds(cabBottomRow.removeFromLeft(cabBottomRow.getWidth() / 2 - static_cast<int>(4.0f * sc)));
     cabBottomRow.removeFromLeft(static_cast<int>(8.0f * sc));

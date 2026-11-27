@@ -177,7 +177,8 @@ void KalyxBassRigProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     cabSt.muteB      = getF("cab_b_mute") > 0.5f;
     cabSt.soloB      = getF("cab_b_solo") > 0.5f;
     cabSt.panBPct    = getF("cab_b_pan");
-    cabSt.mixPct     = getF("cab_mix");
+    cabSt.levelADb   = getF("cab_a_level");
+    cabSt.levelBDb   = getF("cab_b_level");
     cabSt.autoPhase  = getF("cab_auto_phase") > 0.5f;
     cabSt.breakupPct = getF("cab_breakup");
     cabSt.roomPct    = getF("cab_room");
@@ -213,10 +214,12 @@ void KalyxBassRigProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     }
 
     kalyx::bass::fx::PedalboardState pbSt;
-    pbSt.compEn    = getF("fx_comp_en") > 0.5f;
-    pbSt.compMode  = static_cast<int>(getF("fx_comp_mode"));
-    pbSt.compAmt   = getF("fx_comp_amt");
-    pbSt.compBlend = getF("fx_comp_blend");
+    pbSt.compEn       = getF("fx_comp_en") > 0.5f;
+    pbSt.compMode     = static_cast<int>(getF("fx_comp_mode"));
+    pbSt.compIn       = getF("fx_comp_in");
+    pbSt.compAmt      = getF("fx_comp_amt");
+    pbSt.compBlend    = getF("fx_comp_blend");
+    pbSt.compMakeupDb = getF("fx_comp_makeup");
 
     pbSt.octEn    = getF("fx_oct_en") > 0.5f;
     pbSt.octClean = getF("fx_oct_clean");
@@ -234,16 +237,19 @@ void KalyxBassRigProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     pbSt.tdrvDrv   = getF("fx_tdrv_drv");
     pbSt.tdrvTone  = getF("fx_tdrv_tone");
     pbSt.tdrvBlend = getF("fx_tdrv_blend");
+    pbSt.tdrvLvlDb = getF("fx_tdrv_lvl");
 
     pbSt.ratEn    = getF("fx_rat_en") > 0.5f;
     pbSt.ratDist  = getF("fx_rat_dist");
     pbSt.ratFlt   = getF("fx_rat_flt");
     pbSt.ratBlend = getF("fx_rat_blend");
+    pbSt.ratLvlDb = getF("fx_rat_lvl");
 
-    pbSt.fuzzEn   = getF("fx_fuzz_en") > 0.5f;
-    pbSt.fuzzSust = getF("fx_fuzz_sust");
-    pbSt.fuzzTilt = getF("fx_fuzz_tilt");
-    pbSt.fuzzLow  = getF("fx_fuzz_low");
+    pbSt.fuzzEn    = getF("fx_fuzz_en") > 0.5f;
+    pbSt.fuzzSust  = getF("fx_fuzz_sust");
+    pbSt.fuzzTilt  = getF("fx_fuzz_tilt");
+    pbSt.fuzzLow   = getF("fx_fuzz_low");
+    pbSt.fuzzLvlDb = getF("fx_fuzz_lvl");
 
     pbSt.choEn    = getF("fx_cho_en") > 0.5f;
     pbSt.choRate  = getF("fx_cho_rate");

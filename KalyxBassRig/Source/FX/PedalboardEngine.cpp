@@ -213,25 +213,29 @@ void PedalboardEngine::runComp(double& l, double& r) noexcept
     const double att = std::exp(-1.0 / (attMs * 0.001 * sampleRate_));
     const double rel = std::exp(-1.0 / (relMs * 0.001 * sampleRate_));
 
-    const double det = std::max(std::abs(l), std::abs(r));
+    // Input sensitivity boost (0..100% -> 0 dB..+24 dB) before detector
+    const double inSensGain = std::pow(10.0, (std::clamp(state_.compIn, 0.0, 100.0) / 100.0) * 24.0 / 20.0);
+    const double det = std::max(std::abs(l), std::abs(r)) * inSensGain;
     compEnv_ = (det > compEnv_) ? (att * compEnv_ + (1.0 - att) * det)
                                 : (rel * compEnv_ + (1.0 - rel) * det);
 
     const float inDb = (compEnv_ > 1.0e-6) ? static_cast<float>(20.0 * std::log10(compEnv_)) : -60.0f;
-    compInDb_.store(inDb, std::memory_order_relaxed);
+    compInDb_.store(std::clamp(inDb, -60.0f, 0.0f), std::memory_order_relaxed);
 
+    // Threshold range extended down to -60.0 dBFS (-6.0 dBFS at 0% -> -60.0 dBFS at 100%)
     const double amt = std::clamp(state_.compAmt / 100.0, 0.0, 1.0);
-    const double thresh = 0.50 - 0.42 * amt;
+    const double threshDb = -6.0 - 54.0 * amt;
+    const double thresh = std::pow(10.0, threshDb / 20.0);
     double gain = 1.0;
     if (compEnv_ > thresh)
     {
         const double ratio = isFet ? 8.0 : 3.5;
         gain = std::pow(thresh / std::max(compEnv_, 1.0e-7), 1.0 - 1.0 / ratio);
-        gain *= (1.0 + (isFet ? 0.55 : 0.40) * amt);
     }
     const double blend = std::clamp(state_.compBlend / 100.0, 0.0, 1.0);
-    l = l * (1.0 - blend) + (l * gain) * blend;
-    r = r * (1.0 - blend) + (r * gain) * blend;
+    const double makeupGain = std::pow(10.0, std::clamp(state_.compMakeupDb, -24.0, 24.0) / 20.0);
+    l = (l * (1.0 - blend) + (l * gain) * blend) * makeupGain;
+    r = (r * (1.0 - blend) + (r * gain) * blend) * makeupGain;
     compGrDb_.store(static_cast<float>(20.0 * std::log10(std::clamp(gain, 1.0e-3, 1.0))), std::memory_order_relaxed);
 }
 
@@ -278,8 +282,10 @@ void PedalboardEngine::runEnvFilter(double& l, double& r) noexcept
     envFollow_ = (det > envFollow_) ? (att * envFollow_ + (1.0 - att) * det)
                                     : (dec * envFollow_ + (1.0 - dec) * det);
 
-    const double sens = (state_.envSens / 100.0) * 6.0;
-    const double mod  = std::clamp(envFollow_ * sens, 0.0, 1.0);
+    // Calibrated so -18 dBFS RMS (0.1259) achieves full filter sweep at SENS = 50%
+    const double sensNorm = std::clamp(state_.envSens, 0.0, 100.0);
+    const double sensGain = std::pow(10.0, ((sensNorm - 50.0) / 50.0) * 1.2) * 8.5;
+    const double mod  = std::clamp(envFollow_ * sensGain, 0.0, 1.0);
     const double fc   = 110.0 * std::pow(2600.0 / 110.0, mod);
     const double q    = std::clamp(state_.envQ, 0.8, 10.0);
 
@@ -296,11 +302,12 @@ void PedalboardEngine::runTransDrive(double& l, double& r) noexcept
 
     const double drv = 1.0 + (state_.tdrvDrv / 100.0) * 5.5;
     const double dryBlend = std::clamp(state_.tdrvBlend / 100.0, 0.0, 1.0);
+    const double lvlGain  = std::pow(10.0, std::clamp(state_.tdrvLvlDb, -24.0, 24.0) / 20.0);
 
     double wl = tdrvSatL_.processADAA2(l, drv, 0.14);
     double wr = tdrvSatR_.processADAA2(r, drv, 0.14);
-    wl = tdrvToneL_.processLP(wl);
-    wr = tdrvToneR_.processLP(wr);
+    wl = tdrvToneL_.processLP(wl) * lvlGain;
+    wr = tdrvToneR_.processLP(wr) * lvlGain;
 
     l = l * dryBlend + wl * (1.0 - dryBlend * 0.5);
     r = r * dryBlend + wr * (1.0 - dryBlend * 0.5);
@@ -313,14 +320,15 @@ void PedalboardEngine::runRodentBass(double& l, double& r) noexcept
 
     const double drv = 1.5 + (state_.ratDist / 100.0) * 9.0;
     const double cleanBlend = std::clamp(state_.ratBlend / 100.0, 0.0, 1.0);
+    const double lvlGain    = std::pow(10.0, std::clamp(state_.ratLvlDb, -24.0, 24.0) / 20.0);
 
     // HPF on distortion path so sub-bass isn't crushed
     double wl = ratHpfL_.processSample(l);
     double wr = ratHpfR_.processSample(r);
     wl = ratSatL_.processADAA2(wl, drv, 0.06);
     wr = ratSatR_.processADAA2(wr, drv, 0.06);
-    wl = ratFilterL_.processLP(wl);
-    wr = ratFilterR_.processLP(wr);
+    wl = ratFilterL_.processLP(wl) * lvlGain;
+    wr = ratFilterR_.processLP(wr) * lvlGain;
 
     l = l * cleanBlend + wl * (1.0 - cleanBlend * 0.35);
     r = r * cleanBlend + wr * (1.0 - cleanBlend * 0.35);
@@ -332,6 +340,7 @@ void PedalboardEngine::runBigWallFuzz(double& l, double& r) noexcept
         return;
 
     const double drv = 2.5 + (state_.fuzzSust / 100.0) * 14.0;
+    const double lvlGain = std::pow(10.0, std::clamp(state_.fuzzLvlDb, -24.0, 24.0) / 20.0);
     double wl = fuzzSatL_.processADAA2(l, drv, 0.0);
     double wr = fuzzSatR_.processADAA2(r, drv, 0.0);
 
@@ -342,8 +351,8 @@ void PedalboardEngine::runBigWallFuzz(double& l, double& r) noexcept
     wl = fuzzLowL_.processSample(wl);
     wr = fuzzLowR_.processSample(wr);
 
-    l = wl * 0.85;
-    r = wr * 0.85;
+    l = wl * 0.85 * lvlGain;
+    r = wr * 0.85 * lvlGain;
 }
 
 void PedalboardEngine::runDimChorus(double& l, double& r) noexcept

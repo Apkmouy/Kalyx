@@ -132,7 +132,8 @@ enum class DICircuit
     addBool("cab_b_mute", "Cab B Mute", false);
     addBool("cab_b_solo", "Cab B Solo", false);
     addFloat("cab_b_pan", "Cab B Pan", -100.0f, 100.0f, 0.0f, 1.0f);
-    addFloat("cab_mix", "Cab A/B Mix", 0.0f, 100.0f, 35.0f, 0.1f);
+    addFloat("cab_a_level", "Cab A Level", -48.0f, 12.0f, 0.0f, 0.1f, 2.0f);
+    addFloat("cab_b_level", "Cab B Level", -48.0f, 12.0f, 0.0f, 0.1f, 2.0f);
     addBool("cab_auto_phase", "Cab Auto-Phase", true);
     addFloat("cab_breakup", "Speaker Breakup", 0.0f, 100.0f, 18.0f, 0.1f);
     addFloat("cab_room", "Room Ambience", 0.0f, 100.0f, 15.0f, 0.1f);
@@ -155,8 +156,10 @@ enum class DICircuit
     // Pedal 0: Opto / FET Bass Comp
     addBool("fx_comp_en", "Pedal Comp Enable", false);
     addChoice("fx_comp_mode", "Pedal Comp Mode", { "OPTO", "FET" }, 0);
+    addFloat("fx_comp_in", "Pedal Comp Input", 0.0f, 100.0f, 50.0f, 0.1f);
     addFloat("fx_comp_amt", "Pedal Comp Amount", 0.0f, 100.0f, 40.0f, 0.1f);
     addFloat("fx_comp_blend", "Pedal Comp Blend", 0.0f, 100.0f, 75.0f, 0.1f);
+    addFloat("fx_comp_makeup", "Pedal Comp Makeup", -24.0f, 24.0f, 0.0f, 0.1f);
 
     // Pedal 1: Octaver Poly/Sub
     addBool("fx_oct_en", "Octaver Enable", false);
@@ -177,18 +180,21 @@ enum class DICircuit
     addFloat("fx_tdrv_drv", "Transparent Drive", 0.0f, 100.0f, 45.0f, 0.1f);
     addFloat("fx_tdrv_tone", "Transparent Tone", 0.0f, 100.0f, 55.0f, 0.1f);
     addFloat("fx_tdrv_blend", "Transparent Dry Blend", 0.0f, 100.0f, 50.0f, 0.1f);
+    addFloat("fx_tdrv_lvl", "Transparent Level", -24.0f, 24.0f, 0.0f, 0.1f);
 
     // Pedal 4: Rodent Bass (ProCo Rat Modified)
     addBool("fx_rat_en", "Rodent Bass Enable", false);
     addFloat("fx_rat_dist", "Rodent Dist", 0.0f, 100.0f, 50.0f, 0.1f);
     addFloat("fx_rat_flt", "Rodent Filter", 0.0f, 100.0f, 40.0f, 0.1f);
     addFloat("fx_rat_blend", "Rodent Clean Blend", 0.0f, 100.0f, 35.0f, 0.1f);
+    addFloat("fx_rat_lvl", "Rodent Level", -24.0f, 24.0f, 0.0f, 0.1f);
 
     // Pedal 5: Big Wall Fuzz (Russian Muff)
     addBool("fx_fuzz_en", "Big Wall Fuzz Enable", false);
     addFloat("fx_fuzz_sust", "Fuzz Sustain", 0.0f, 100.0f, 65.0f, 0.1f);
     addFloat("fx_fuzz_tilt", "Fuzz Tilt", -100.0f, 100.0f, 0.0f, 1.0f);
     addFloat("fx_fuzz_low", "Fuzz Low Recovery", 0.0f, 100.0f, 45.0f, 0.1f);
+    addFloat("fx_fuzz_lvl", "Fuzz Level", -24.0f, 24.0f, 0.0f, 0.1f);
 
     // Pedal 6: Dimension Chorus
     addBool("fx_cho_en", "Chorus Enable", false);

@@ -99,7 +99,7 @@ private:
     juce::TextButton loadIrABtn_ { "LOAD IR A" }, loadIrBBtn_ { "LOAD IR B" };
     std::unique_ptr<juce::FileChooser> fileChooser_;
 
-    kalyx::bass::ui::TactileFaderBar cabMixBar_, cabBreakupBar_, cabRoomBar_;
+    kalyx::bass::ui::TactileFaderBar cabALevelBar_, cabBLevelBar_, cabBreakupBar_, cabRoomBar_;
 
     // Right Column: Master & Mixer
     kalyx::bass::ui::AnalogVUMeter vuMeter_;
