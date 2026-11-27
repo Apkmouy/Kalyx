@@ -79,6 +79,8 @@ private:
 
     juce::dsp::Convolution convA_;
     juce::dsp::Convolution convB_;
+    juce::dsp::Gain<float> trimA_;
+    juce::dsp::Gain<float> trimB_;
     juce::AudioBuffer<float> workBufA_;
     juce::AudioBuffer<float> workBufB_;
 

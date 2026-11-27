@@ -35,6 +35,10 @@ void DualCabEngine::prepare(const juce::dsp::ProcessSpec& spec)
     juce::dsp::ProcessSpec monoSpec { sampleRate_, maxBlockSize_, 1 };
     convA_.prepare(monoSpec);
     convB_.prepare(monoSpec);
+    trimA_.prepare(monoSpec);
+    trimB_.prepare(monoSpec);
+    trimA_.setGainDecibels(-20.0f);
+    trimB_.setGainDecibels(-20.0f);
 
     workBufA_.setSize(1, static_cast<int>(maxBlockSize_), false, true, true);
     workBufB_.setSize(1, static_cast<int>(maxBlockSize_), false, true, true);
@@ -119,13 +123,11 @@ void DualCabEngine::loadBufferIntoConvolution(int cabSlot, juce::AudioBuffer<flo
 
     // 1. RMS Normalization & Peak Detection for Auto-Phase Align
     const float* ptr = irBuffer.getReadPointer(0);
-    double sumSq = 0.0;
     float maxAbs = 0.0f;
     int peakIdx  = 0;
     for (int i = 0; i < n; ++i)
     {
         const float v = ptr[i];
-        sumSq += static_cast<double>(v) * static_cast<double>(v);
         if (std::abs(v) > maxAbs)
         {
             maxAbs = std::abs(v);
@@ -133,10 +135,8 @@ void DualCabEngine::loadBufferIntoConvolution(int cabSlot, juce::AudioBuffer<flo
         }
     }
 
-    const double rms = std::sqrt(sumSq / static_cast<double>(n));
-    // Calibrated unity-loudness IR normalization (-12 dB internal compensation vs raw bypass)
-    const float normGain = (rms > 1.0e-7) ? static_cast<float>(0.020 / rms) : 1.0f;
-    irBuffer.applyGain(std::clamp(normGain, 0.01f, 8.0f));
+    const float normGain = (maxAbs > 1.0e-6f) ? (1.0f / maxAbs) : 1.0f;
+    irBuffer.applyGain(std::clamp(normGain, 0.1f, 10.0f));
 
     // Scale peakIdx to current host sampleRate
     const int scaledPeak = static_cast<int>(std::round(static_cast<double>(peakIdx) * (sampleRate_ / std::max(sourceSampleRate, 8000.0))));
@@ -219,12 +219,13 @@ void DualCabEngine::processBlock(const float* monoIn, float* outL, float* outR, 
     const bool runA = !state_.muteA && (!anySolo || state_.soloA);
     const bool runB = !state_.muteB && (!anySolo || state_.soloB);
 
-    // 2. Zero-latency convolution for Cab A & Cab B (CPU bypass when muted/unsoloed)
+    // 2. Zero-latency convolution for Cab A & Cab B + -20 dB static trim (CPU bypass when muted/unsoloed)
     if (runA)
     {
         juce::dsp::AudioBlock<float> blkA(workBufA_.getArrayOfWritePointers(), 1, static_cast<size_t>(numSamples));
         juce::dsp::ProcessContextReplacing<float> ctxA(blkA);
         convA_.process(ctxA);
+        trimA_.process(ctxA);
     }
     else
     {
@@ -236,6 +237,7 @@ void DualCabEngine::processBlock(const float* monoIn, float* outL, float* outR, 
         juce::dsp::AudioBlock<float> blkB(workBufB_.getArrayOfWritePointers(), 1, static_cast<size_t>(numSamples));
         juce::dsp::ProcessContextReplacing<float> ctxB(blkB);
         convB_.process(ctxB);
+        trimB_.process(ctxB);
     }
     else
     {
