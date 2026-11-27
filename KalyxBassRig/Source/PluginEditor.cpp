@@ -591,7 +591,7 @@ void KalyxBassRigEditor::paint(juce::Graphics& g)
     g.fillRoundedRectangle(badgeR, 4.0f * sc);
     g.setColour(KalyxTheme::nightTextPrimary);
     g.setFont(KalyxTheme::makeMonoFont(10.5f * sc, juce::Font::bold));
-    g.drawFittedText("v1.0.0", badgeR.toNearestInt(), juce::Justification::centred, 1);
+    g.drawFittedText("v" JucePlugin_VersionString, badgeR.toNearestInt(), juce::Justification::centred, 1);
 
     // 4 Main Panels (above bottom InfoBar)
     const int infoH = static_cast<int>(25.0f * sc);

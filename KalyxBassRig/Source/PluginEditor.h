@@ -34,7 +34,7 @@ private:
     float uiScale_ { 1.0f };
     kalyx::bass::ChassisTheme theme_ { kalyx::bass::ChassisTheme::Night };
     int lastModelIdx_ { -1 };
-    juce::String infoBarText_ { juce::String::fromUTF8("Kalyx Bass Rig v1.0.0 — Survolez un contrôle pour afficher son aide et sa valeur exacte.") };
+    juce::String infoBarText_ { juce::String::fromUTF8("Kalyx Bass Rig v" JucePlugin_VersionString " — Survolez un contrôle pour afficher son aide et sa valeur exacte.") };
 
     // Header
     juce::TextButton tunerBtn_ { "TUNER" };

@@ -603,7 +603,7 @@ void SettingsOverlay::paint(juce::Graphics& g)
 
     g.setColour(KalyxTheme::getTextPrimary(theme_));
     g.setFont(KalyxTheme::makeFont(14.0f * sc, juce::Font::bold));
-    g.drawFittedText("KALYX // BASS RIG v1.0.0 — SETTINGS",
+    g.drawFittedText(juce::String::fromUTF8("KALYX // BASS RIG v" JucePlugin_VersionString " — SETTINGS"),
                      card.reduced(14.0f * sc).withHeight(24.0f * sc).toNearestInt(),
                      juce::Justification::centredLeft, 1);
 
