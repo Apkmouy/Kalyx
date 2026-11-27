@@ -28,66 +28,85 @@ void StrobeTunerBar::paint(juce::Graphics& g)
 {
     const float sc = uiScale_;
     const auto r = getLocalBounds().toFloat().reduced(1.0f * sc);
-    const auto bg = darkText_ ? KalyxTheme::dayControlIdleBg : KalyxTheme::nightControlIdleBg;
+    const auto bg = darkText_ ? KalyxTheme::dayControlIdleBg : KalyxTheme::nightChassisBg;
     const auto bd = darkText_ ? KalyxTheme::dayGridBorder : KalyxTheme::nightGridBorder;
     const auto tx = darkText_ ? KalyxTheme::dayTextPrimary : KalyxTheme::nightTextPrimary;
 
     g.setColour(bg);
     g.fillRoundedRectangle(r, 4.0f * sc);
     g.setColour(bd);
-    g.drawRoundedRectangle(r, 4.0f * sc, 1.0f * sc);
+    g.drawRoundedRectangle(r, 4.0f * sc, 1.2f * sc);
 
     static const char* kNotes[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-    juce::String noteStr = "--";
-    if (conf_ > 0.25f && midi_ >= 0)
+    const bool active = (conf_ > 0.25f && midi_ >= 0);
+    juce::String noteStr = "—";
+    if (active)
     {
         const int noteIdx = ((midi_ % 12) + 12) % 12;
         const int oct = (midi_ / 12) - 1;
         noteStr = juce::String(kNotes[noteIdx]) + juce::String(oct);
     }
 
-    const bool inTune = (conf_ > 0.25f && std::abs(cents_) < 4.0f);
-    auto noteR = r.withWidth(44.0f * sc);
-    g.setColour(inTune ? KalyxTheme::jadeGreen : tx);
-    g.setFont(KalyxTheme::makeMonoFont(13.0f * sc, juce::Font::bold));
+    const bool inTune = (active && std::abs(cents_) <= 3.0f);
+
+    // Large bold Note badge on left
+    auto noteR = r.withWidth(46.0f * sc).reduced(2.0f * sc);
+    g.setColour(inTune ? KalyxTheme::jadeGreen.withAlpha(0.22f)
+                       : (darkText_ ? KalyxTheme::dayStripBg : KalyxTheme::nightStripBg));
+    g.fillRoundedRectangle(noteR, 3.0f * sc);
+    g.setColour(inTune ? KalyxTheme::jadeGreen : (active ? tx : tx.withAlpha(0.45f)));
+    g.setFont(KalyxTheme::makeMonoFont(15.0f * sc, juce::Font::bold));
     g.drawFittedText(noteStr, noteR.toNearestInt(), juce::Justification::centred, 1);
 
-    auto barR = r.withTrimmedLeft(46.0f * sc).withTrimmedRight(52.0f * sc).reduced(2.0f * sc, 6.0f * sc);
-    g.setColour(darkText_ ? KalyxTheme::dayKnobTrackBg : KalyxTheme::knobTrackBg);
-    g.fillRoundedRectangle(barR, 3.0f * sc);
+    // Precision horizontal cents gauge (-50 to +50)
+    auto gaugeR = r.withTrimmedLeft(50.0f * sc).withTrimmedRight(56.0f * sc).reduced(2.0f * sc, 4.0f * sc);
+    const float cx = gaugeR.getCentreX();
+    const float trackY = gaugeR.getCentreY() + 2.0f * sc;
 
-    // Strobe ticks
-    const int nTicks = 12;
-    const float tickW = barR.getWidth() / static_cast<float>(nTicks);
-    for (int i = 0; i < nTicks; ++i)
+    // Recessed track line
+    g.setColour(darkText_ ? KalyxTheme::dayKnobTrackBg : KalyxTheme::knobTrackBg);
+    g.fillRoundedRectangle(gaugeR.getX(), trackY - 2.0f * sc, gaugeR.getWidth(), 4.0f * sc, 2.0f * sc);
+
+    // Scale ticks (-50, -25, 0, +25, +50)
+    for (int t = -2; t <= 2; ++t)
     {
-        const float wave = 0.5f + 0.5f * std::sin(strobePhase_ + static_cast<float>(i) * 1.05f);
-        if (conf_ > 0.25f)
-        {
-            g.setColour((inTune ? KalyxTheme::jadeGreen : KalyxTheme::kalyxRoyalBlueGlow).withAlpha(0.18f + 0.35f * wave));
-            g.fillRect(barR.getX() + i * tickW + 1.0f, barR.getY() + 1.0f, std::max(1.0f, tickW - 2.0f), barR.getHeight() - 2.0f);
-        }
+        const float txPos = cx + (static_cast<float>(t) / 2.0f) * (gaugeR.getWidth() * 0.46f);
+        const float tickH = (t == 0) ? 10.0f * sc : 5.0f * sc;
+        g.setColour((t == 0 && inTune) ? KalyxTheme::jadeGreen : tx.withAlpha(t == 0 ? 0.65f : 0.28f));
+        g.drawLine(txPos, trackY - tickH, txPos, trackY + tickH * 0.6f, (t == 0) ? 1.8f * sc : 1.0f * sc);
     }
 
-    // Center target line + needle
-    const float cx = barR.getCentreX();
-    g.setColour(tx.withAlpha(0.45f));
-    g.drawLine(cx, barR.getY() - 2.0f * sc, cx, barR.getBottom() + 2.0f * sc, 1.2f * sc);
+    // Center lock LED when +-3 cents
+    if (inTune)
+    {
+        g.setColour(KalyxTheme::jadeGreen.withAlpha(0.35f));
+        g.fillEllipse(cx - 8.0f * sc, trackY - 8.0f * sc, 16.0f * sc, 16.0f * sc);
+        g.setColour(KalyxTheme::kalyxRoyalBlue);
+        g.fillEllipse(cx - 4.0f * sc, trackY - 4.0f * sc, 8.0f * sc, 8.0f * sc);
+    }
 
-    if (conf_ > 0.25f)
+    // Visual cursor (-50..+50 cents)
+    if (active)
     {
         const float normC = std::clamp(cents_ / 50.0f, -1.0f, 1.0f);
-        const float nx = cx + normC * (barR.getWidth() * 0.46f);
-        g.setColour(inTune ? KalyxTheme::jadeGreen : KalyxTheme::classicAmber);
-        g.fillRoundedRectangle(nx - 2.5f * sc, barR.getY() - 1.0f * sc, 5.0f * sc, barR.getHeight() + 2.0f * sc, 2.0f * sc);
+        const float nx = cx + normC * (gaugeR.getWidth() * 0.46f);
+        g.setColour(inTune ? KalyxTheme::jadeGreen : (std::abs(cents_) < 12.0f ? KalyxTheme::kalyxRoyalBlueGlow : KalyxTheme::classicAmber));
+        g.fillRoundedRectangle(nx - 2.5f * sc, gaugeR.getY() + 1.0f * sc, 5.0f * sc, gaugeR.getHeight() - 2.0f * sc, 2.5f * sc);
+    }
+    else
+    {
+        g.setColour(tx.withAlpha(0.35f));
+        g.setFont(KalyxTheme::makeFont(8.5f * sc, juce::Font::bold));
+        g.drawFittedText("TUNER READY", gaugeR.withHeight(11.0f * sc).toNearestInt(), juce::Justification::centredTop, 1);
     }
 
-    auto centsR = r.withLeft(r.getRight() - 50.0f * sc);
-    g.setColour(tx.withAlpha(0.75f));
-    g.setFont(KalyxTheme::makeMonoFont(10.0f * sc, juce::Font::plain));
-    const juce::String cStr = (conf_ > 0.25f)
+    // Cents / Hz readout on right
+    auto centsR = r.withLeft(r.getRight() - 54.0f * sc).reduced(2.0f * sc);
+    g.setColour(active ? (inTune ? KalyxTheme::jadeGreen : tx.withAlpha(0.88f)) : tx.withAlpha(0.45f));
+    g.setFont(KalyxTheme::makeMonoFont(10.0f * sc, juce::Font::bold));
+    const juce::String cStr = active
                                   ? ((cents_ >= 0.0f ? "+" : "") + juce::String(cents_, 0) + "c")
-                                  : "---";
+                                  : "440Hz";
     g.drawFittedText(cStr, centsR.toNearestInt(), juce::Justification::centred, 1);
 }
 

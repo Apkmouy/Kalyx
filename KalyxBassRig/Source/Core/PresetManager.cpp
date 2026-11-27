@@ -19,9 +19,6 @@ PresetManager::PresetManager(juce::AudioProcessorValueTreeState& apvts)
                          .getChildFile("KalyxBassRig")
                          .getChildFile("Presets");
     userPresetDir_.createDirectory();
-
-    slotStates_[0] = apvts_.copyState();
-    slotStates_[1] = apvts_.copyState();
 }
 
 juce::StringArray PresetManager::getAllPresetNames() const
@@ -201,31 +198,69 @@ void PresetManager::loadPresetByIndex(int index)
     }
 }
 
-bool PresetManager::saveUserPreset(const juce::String& name)
+bool PresetManager::isUserPreset(int index) const
 {
-    if (name.trim().isEmpty())
-        return false;
-    userPresetDir_.createDirectory();
-    const auto file = userPresetDir_.getChildFile(name.trim() + ".xml");
-    if (auto xml = apvts_.copyState().createXml())
-        return xml->writeTo(file);
+    return index >= factoryNames_.size() && index < getAllPresetNames().size();
+}
+
+bool PresetManager::saveCurrentPreset()
+{
+    if (isUserPreset(currentIndex_))
+        return saveUserPreset(getCurrentPresetName());
     return false;
 }
 
-void PresetManager::switchSlotAB(int slot)
+bool PresetManager::saveUserPreset(const juce::String& name)
 {
-    const int target = (slot == 0) ? 0 : 1;
-    if (target == activeSlot_)
-        return;
-    slotStates_[static_cast<size_t>(activeSlot_)] = apvts_.copyState();
-    activeSlot_ = target;
-    apvts_.replaceState(slotStates_[static_cast<size_t>(activeSlot_)]);
+    const auto trimmed = name.trim();
+    if (trimmed.isEmpty())
+        return false;
+    userPresetDir_.createDirectory();
+    const auto file = userPresetDir_.getChildFile(trimmed + ".xml");
+    if (auto xml = apvts_.copyState().createXml())
+    {
+        if (xml->writeTo(file))
+        {
+            const auto all = getAllPresetNames();
+            const int idx = all.indexOf(trimmed);
+            if (idx >= 0) currentIndex_ = idx;
+            return true;
+        }
+    }
+    return false;
 }
 
-void PresetManager::copyAToB()
+bool PresetManager::renameUserPreset(int index, const juce::String& newName)
 {
-    slotStates_[static_cast<size_t>(activeSlot_)] = apvts_.copyState();
-    slotStates_[static_cast<size_t>(1 - activeSlot_)] = slotStates_[static_cast<size_t>(activeSlot_)].createCopy();
+    const auto trimmed = newName.trim();
+    if (!isUserPreset(index) || trimmed.isEmpty())
+        return false;
+    const auto all = getAllPresetNames();
+    const auto oldFile = userPresetDir_.getChildFile(all[index] + ".xml");
+    const auto newFile = userPresetDir_.getChildFile(trimmed + ".xml");
+    if (oldFile.existsAsFile() && oldFile.moveFileTo(newFile))
+    {
+        const auto updated = getAllPresetNames();
+        const int idx = updated.indexOf(trimmed);
+        if (idx >= 0) currentIndex_ = idx;
+        return true;
+    }
+    return false;
+}
+
+bool PresetManager::deleteUserPreset(int index)
+{
+    if (!isUserPreset(index))
+        return false;
+    const auto all = getAllPresetNames();
+    const auto file = userPresetDir_.getChildFile(all[index] + ".xml");
+    if (file.existsAsFile() && file.deleteFile())
+    {
+        currentIndex_ = 0;
+        loadPresetByIndex(0);
+        return true;
+    }
+    return false;
 }
 
 } // namespace kalyx::bass::core

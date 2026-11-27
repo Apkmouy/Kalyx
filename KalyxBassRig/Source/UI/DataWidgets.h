@@ -28,7 +28,8 @@ struct KalyxRotaryControl
               bool isBipolar,
               bool isDarkText,
               double defaultVal,
-              std::function<juce::String(double)> fmt = nullptr);
+              std::function<juce::String(double)> fmt = nullptr,
+              const juce::String& infoHint = {});
 
     void setUiScale(float s);
     void setThemeColours(juce::Colour accent, bool isDarkText);
@@ -37,7 +38,8 @@ struct KalyxRotaryControl
     void setBoundsCompact(float x, float y, float w, float h);
 };
 
-class TactileFaderBar final : public juce::Component
+class TactileFaderBar final : public juce::Component,
+                              public juce::SettableTooltipClient
 {
 public:
     TactileFaderBar() = default;
@@ -50,8 +52,10 @@ public:
               bool bipolar,
               bool darkText,
               double defaultVal,
-              std::function<juce::String(double)> fmt = nullptr);
+              std::function<juce::String(double)> fmt = nullptr,
+              const juce::String& infoHint = {});
 
+    [[nodiscard]] juce::String getFormattedValue() const;
     void setUiScale(float s) noexcept { uiScale_ = std::clamp(s, 0.75f, 2.20f); repaint(); }
     void setThemeColours(juce::Colour accent, bool darkText) noexcept;
     void setDimmed(bool d) noexcept { dimmed_ = d; setEnabled(!d); repaint(); }

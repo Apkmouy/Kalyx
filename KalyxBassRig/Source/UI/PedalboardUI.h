@@ -11,7 +11,8 @@
 namespace kalyx::bass::ui
 {
 
-class PedalCardComponent final : public juce::Component
+class PedalCardComponent final : public juce::Component,
+                                 public juce::SettableTooltipClient
 {
 public:
     PedalCardComponent(juce::AudioProcessorValueTreeState& apvts, int pedalId);
@@ -20,9 +21,12 @@ public:
     void setUiScale(float s) noexcept;
     void setDarkText(bool dark) noexcept;
     void setTelemetryGr(float grDb) noexcept { compGrDb_ = grDb; if (pedalId_ == 0) repaint(); }
+    void updateBypassVisuals();
 
     void paint(juce::Graphics& g) override;
     void resized() override;
+    void mouseEnter(const juce::MouseEvent& e) override;
+    void mouseExit(const juce::MouseEvent& e) override;
     void mouseDown(const juce::MouseEvent& e) override;
     void mouseDrag(const juce::MouseEvent& e) override;
 
@@ -33,6 +37,7 @@ private:
     juce::Colour accent_ { KalyxTheme::kalyxRoyalBlue };
     float uiScale_  { 1.0f };
     bool  darkText_ { false };
+    bool  isHovered_ { false };
     float compGrDb_ { 0.0f };
     juce::Point<int> dragStart_;
 

@@ -15,127 +15,162 @@ PedalCardComponent::PedalCardComponent(juce::AudioProcessorValueTreeState& apvts
     auto fmtMs  = [](double v) { return juce::String(v, 0) + " ms"; };
     auto fmtDb  = [](double v) { return KalyxTheme::formatDbClean(v); };
 
-    auto addBar = [&](const char* id, const char* lbl, bool bipolar, double defV, std::function<juce::String(double)> fmt)
+    auto addBar = [&](const char* id, const char* lbl, bool bipolar, double defV, std::function<juce::String(double)> fmt, const juce::String& tip)
     {
         auto b = std::make_unique<TactileFaderBar>();
-        b->init(*this, apvts_, id, lbl, accent_, bipolar, darkText_, defV, std::move(fmt));
+        b->init(*this, apvts_, id, lbl, accent_, bipolar, darkText_, defV, std::move(fmt), tip);
         bars_.push_back(std::move(b));
     };
+
+    setWantsKeyboardFocus(false);
 
     switch (pedalId_)
     {
         case fx::Pedal_OptoFetComp:
             title_  = "OPTO / FET COMP";
             accent_ = KalyxTheme::classicAmber;
+            setTooltip("Opto / FET Bass Comp : Compresseur dynamique à double topologie (OPTO doux / FET rapide).");
             bypassAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts_, "fx_comp_en", bypassBtn_);
             pill_ = std::make_unique<KalyxSegmentedPill>(apvts_, "fx_comp_mode", "", juce::StringArray { "OPTO", "FET" }, accent_, darkText_);
+            pill_->setWantsKeyboardFocus(false);
             addAndMakeVisible(*pill_);
-            addBar("fx_comp_amt", "COMP", false, 40.0, fmtPct);
-            addBar("fx_comp_blend", "BLEND", false, 75.0, fmtPct);
+            addBar("fx_comp_amt", "COMP", false, 40.0, fmtPct, "Opto / FET Comp : Taux de compression appliqué au signal.");
+            addBar("fx_comp_blend", "BLEND", false, 75.0, fmtPct, "Opto / FET Comp : Dosage parallèle entre signal sec et compressé.");
             break;
 
         case fx::Pedal_Octaver:
             title_  = "OCTAVER POLY/SUB";
             accent_ = KalyxTheme::kalyxAubergine;
+            setTooltip("Octaver Poly/Sub : Générateur d'octaves inférieures (-1/-2) et supérieure (+1).");
             bypassAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts_, "fx_oct_en", bypassBtn_);
-            addBar("fx_oct_clean", "CLEAN", false, 70.0, fmtPct);
-            addBar("fx_oct_sub1", "SUB 1", false, 50.0, fmtPct);
-            addBar("fx_oct_sub2", "SUB 2", false, 20.0, fmtPct);
-            addBar("fx_oct_up", "OCT UP", false, 0.0, fmtPct);
+            addBar("fx_oct_clean", "CLEAN", false, 70.0, fmtPct, "Octaver Poly/Sub : Niveau du signal direct non traité.");
+            addBar("fx_oct_sub1", "SUB 1", false, 50.0, fmtPct, "Octaver Poly/Sub : Règle le niveau de l'octave inférieure (-1 Oct).");
+            addBar("fx_oct_sub2", "SUB 2", false, 20.0, fmtPct, "Octaver Poly/Sub : Règle le niveau de la double sous-octave (-2 Oct).");
+            addBar("fx_oct_up", "OCT UP", false, 0.0, fmtPct, "Octaver Poly/Sub : Règle le niveau de l'octave supérieure (+1 Oct).");
             break;
 
         case fx::Pedal_EnvFilter:
             title_  = "ENV FILTER WAH";
             accent_ = KalyxTheme::jadeGreen;
+            setTooltip("Envelope Filter : Auto-Wah résonante pilotée par la dynamique de jeu.");
             bypassAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts_, "fx_env_en", bypassBtn_);
-            addBar("fx_env_sens", "SENS", false, 55.0, fmtPct);
-            addBar("fx_env_att", "ATT", false, 8.0, fmtMs);
-            addBar("fx_env_dec", "DEC", false, 180.0, fmtMs);
-            addBar("fx_env_q", "Q", false, 3.5, [](double v) { return "Q " + juce::String(v, 1); });
+            addBar("fx_env_sens", "SENS", false, 55.0, fmtPct, "Envelope Filter : Sensibilité du suiveur d'enveloppe.");
+            addBar("fx_env_att", "ATT", false, 8.0, fmtMs, "Envelope Filter : Temps d'ouverture du filtre.");
+            addBar("fx_env_dec", "DEC", false, 180.0, fmtMs, "Envelope Filter : Temps de fermeture du filtre.");
+            addBar("fx_env_q", "Q", false, 3.5, [](double v) { return "Q " + juce::String(v, 1); }, "Envelope Filter : Résonance (Q) du filtre passe-bande.");
             break;
 
         case fx::Pedal_TransDrive:
             title_  = "TRANSPARENT DRV";
             accent_ = KalyxTheme::hybridCyan;
+            setTooltip("Transparent Drive : Overdrive type B3K/Klon à écrêtage asymétrique ADAA 64-bit.");
             bypassAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts_, "fx_tdrv_en", bypassBtn_);
-            addBar("fx_tdrv_drv", "DRIVE", false, 45.0, fmtPct);
-            addBar("fx_tdrv_tone", "TONE", false, 55.0, fmtPct);
-            addBar("fx_tdrv_blend", "DRY BLEND", false, 50.0, fmtPct);
+            addBar("fx_tdrv_drv", "DRIVE", false, 45.0, fmtPct, "Transparent Drive : Saturation harmonique asymétrique.");
+            addBar("fx_tdrv_tone", "TONE", false, 55.0, fmtPct, "Transparent Drive : Brillance de l'étage de saturation.");
+            addBar("fx_tdrv_blend", "DRY BLEND", false, 50.0, fmtPct, "Transparent Drive : Mélange avec la basse claire pour préserver l'attaque.");
             break;
 
         case fx::Pedal_RodentBass:
             title_  = "RODENT BASS";
             accent_ = KalyxTheme::tangerineOrange;
+            setTooltip("Rodent Bass : Distorsion type Rat modifiée basse avec HPF interne et Clean Blend.");
             bypassAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts_, "fx_rat_en", bypassBtn_);
-            addBar("fx_rat_dist", "DIST", false, 50.0, fmtPct);
-            addBar("fx_rat_flt", "FILTER", false, 40.0, fmtPct);
-            addBar("fx_rat_blend", "CLEAN", false, 35.0, fmtPct);
+            addBar("fx_rat_dist", "DIST", false, 50.0, fmtPct, "Rodent Bass : Taux de distorsion rocailleuse.");
+            addBar("fx_rat_flt", "FILTER", false, 40.0, fmtPct, "Rodent Bass : Coupe-haut inversé (plus élevé = plus sombre).");
+            addBar("fx_rat_blend", "CLEAN", false, 35.0, fmtPct, "Rodent Bass : Réinjection du signal grave non saturé.");
             break;
 
         case fx::Pedal_BigWallFuzz:
             title_  = "BIG WALL FUZZ";
             accent_ = KalyxTheme::alertRed;
+            setTooltip("Big Wall Fuzz : Fuzz massive type Russian Muff avec mid-scoop et récupération des graves.");
             bypassAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts_, "fx_fuzz_en", bypassBtn_);
-            addBar("fx_fuzz_sust", "SUSTAIN", false, 65.0, fmtPct);
-            addBar("fx_fuzz_tilt", "TILT", true, 0.0, [](double v) { return juce::String(v, 0); });
-            addBar("fx_fuzz_low", "LOW REC", false, 45.0, fmtPct);
+            addBar("fx_fuzz_sust", "SUSTAIN", false, 65.0, fmtPct, "Big Wall Fuzz : Saturation extrême et sustain infini.");
+            addBar("fx_fuzz_tilt", "TILT", true, 0.0, [](double v) { return juce::String(v, 0); }, "Big Wall Fuzz : Balance spectrale Tilt (graves vs aigus).");
+            addBar("fx_fuzz_low", "LOW REC", false, 45.0, fmtPct, "Big Wall Fuzz : Récupération du bas du spectre sous 85 Hz.");
             break;
 
         case fx::Pedal_DimChorus:
             title_  = "DIM CHORUS (200Hz+)";
             accent_ = KalyxTheme::kalyxRoyalBlueGlow;
+            setTooltip("Dimension Chorus : Chorus stéréo avec crossover Low Retain @ 200 Hz gardant les graves mono.");
             bypassAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts_, "fx_cho_en", bypassBtn_);
-            addBar("fx_cho_rate", "RATE", false, 0.8, fmtHz);
-            addBar("fx_cho_depth", "DEPTH", false, 45.0, fmtPct);
-            addBar("fx_cho_mix", "MIX", false, 40.0, fmtPct);
+            addBar("fx_cho_rate", "RATE", false, 0.8, fmtHz, "Dimension Chorus : Vitesse de modulation LFO.");
+            addBar("fx_cho_depth", "DEPTH", false, 45.0, fmtPct, "Dimension Chorus : Profondeur de désaccordage stéréo.");
+            addBar("fx_cho_mix", "MIX", false, 40.0, fmtPct, "Dimension Chorus : Dosage du chorus stéréo au-dessus de 200 Hz.");
             break;
 
         case fx::Pedal_AnalogPhaser:
             title_  = "ANALOG PHASER";
             accent_ = KalyxTheme::tangerineOrange;
+            setTooltip("Analog Phaser : Phaser All-Pass 4/8 étages synchronisable au tempo du DAW.");
             bypassAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts_, "fx_pha_en", bypassBtn_);
             pill_ = std::make_unique<KalyxSegmentedPill>(apvts_, "fx_pha_div", "", juce::StringArray { "1/4", "1/8", "1/8D", "1/16" }, accent_, darkText_);
+            pill_->setWantsKeyboardFocus(false);
             addAndMakeVisible(*pill_);
             syncBtn_ = std::make_unique<juce::ToggleButton>("SYNC");
             syncBtn_->setClickingTogglesState(true);
+            syncBtn_->setWantsKeyboardFocus(false);
+            syncBtn_->setTooltip("Analog Phaser : Synchronise la vitesse LFO sur le BPM du DAW.");
             syncAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts_, "fx_pha_sync", *syncBtn_);
             addAndMakeVisible(*syncBtn_);
             pad2d_ = std::make_unique<VectorPad2D>();
             pad2d_->init(*this, apvts_, "fx_pha_rate", "fx_pha_depth", "RATE", "DEPTH", accent_, darkText_, 0.1f, 0.6f);
-            addBar("fx_pha_fb", "FEEDBACK", false, 35.0, fmtPct);
+            pad2d_->setWantsKeyboardFocus(false);
+            addBar("fx_pha_fb", "FEEDBACK", false, 35.0, fmtPct, "Analog Phaser : Réinjection de résonance du phaser.");
             break;
 
         case fx::Pedal_TapeEcho:
             title_  = "TAPE ECHO";
             accent_ = KalyxTheme::classicAmber;
+            setTooltip("Tape Echo : Délai à bande magnétique avec saturation ADAA et wow & flutter.");
             bypassAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts_, "fx_tape_en", bypassBtn_);
             pill_ = std::make_unique<KalyxSegmentedPill>(apvts_, "fx_tape_div", "", juce::StringArray { "1/4", "1/8", "1/8D", "1/16" }, accent_, darkText_);
+            pill_->setWantsKeyboardFocus(false);
             addAndMakeVisible(*pill_);
             syncBtn_ = std::make_unique<juce::ToggleButton>("SYNC");
             syncBtn_->setClickingTogglesState(true);
+            syncBtn_->setWantsKeyboardFocus(false);
+            syncBtn_->setTooltip("Tape Echo : Synchronise le temps de délai sur le BPM du DAW.");
             syncAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts_, "fx_tape_sync", *syncBtn_);
             addAndMakeVisible(*syncBtn_);
             pad2d_ = std::make_unique<VectorPad2D>();
             pad2d_->init(*this, apvts_, "fx_tape_time", "fx_tape_rep", "TIME", "REPEATS", accent_, darkText_, 0.25f, 0.4f);
-            addBar("fx_tape_mix", "MIX", false, 28.0, fmtPct);
+            pad2d_->setWantsKeyboardFocus(false);
+            addBar("fx_tape_mix", "MIX", false, 28.0, fmtPct, "Tape Echo : Dosage des répétitions dans le mix final.");
             break;
 
         case fx::Pedal_StudioEQ:
         default:
             title_  = "STUDIO EQ + MONO";
             accent_ = KalyxTheme::jadeGreen;
+            setTooltip("Studio Bass EQ : Égaliseur 4 bandes + Mono Maker recentrant les basses fréquences.");
             bypassAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts_, "fx_eq4_en", bypassBtn_);
-            addBar("fx_eq4_mono_freq", "MONO <", false, 120.0, [](double v) { return juce::String(v, 0) + " Hz"; });
-            addBar("fx_eq4_b1", "60 Hz", true, 0.0, fmtDb);
-            addBar("fx_eq4_b2", "250 Hz", true, 0.0, fmtDb);
-            addBar("fx_eq4_b3", "1.2 kHz", true, 0.0, fmtDb);
-            addBar("fx_eq4_b4", "4.5 kHz", true, 0.0, fmtDb);
+            addBar("fx_eq4_mono_freq", "MONO <", false, 120.0, [](double v) { return juce::String(v, 0) + " Hz"; }, "Mono Maker : Recentre en mono pur tout le spectre sous cette fréquence.");
+            addBar("fx_eq4_b1", "60 Hz", true, 0.0, fmtDb, "Studio EQ : Bande Low Shelf 60 Hz.");
+            addBar("fx_eq4_b2", "250 Hz", true, 0.0, fmtDb, "Studio EQ : Bande Bell 250 Hz.");
+            addBar("fx_eq4_b3", "1.2 kHz", true, 0.0, fmtDb, "Studio EQ : Bande Bell 1.2 kHz.");
+            addBar("fx_eq4_b4", "4.5 kHz", true, 0.0, fmtDb, "Studio EQ : Bande High Shelf 4.5 kHz.");
             break;
     }
 
     bypassBtn_.setClickingTogglesState(true);
+    bypassBtn_.setWantsKeyboardFocus(false);
     bypassBtn_.setColour(juce::ToggleButton::tickColourId, accent_);
+    bypassBtn_.setTooltip("Active ou désactive (Bypass) cette pédale.");
+    bypassBtn_.onClick = [this]() { updateBypassVisuals(); };
     addAndMakeVisible(bypassBtn_);
+    updateBypassVisuals();
+}
+
+void PedalCardComponent::updateBypassVisuals()
+{
+    const float childAlpha = bypassBtn_.getToggleState() ? 1.0f : 0.40f;
+    for (auto& b : bars_) b->setAlpha(childAlpha);
+    if (pill_) pill_->setAlpha(childAlpha);
+    if (pad2d_) pad2d_->setAlpha(childAlpha);
+    if (syncBtn_) syncBtn_->setAlpha(childAlpha);
+    repaint();
 }
 
 void PedalCardComponent::setUiScale(float s) noexcept
@@ -165,17 +200,21 @@ void PedalCardComponent::paint(juce::Graphics& g)
     const auto bd = darkText_ ? KalyxTheme::dayGridBorder : KalyxTheme::nightGridBorder;
     const auto tx = darkText_ ? KalyxTheme::dayTextPrimary : KalyxTheme::nightTextPrimary;
     const bool on = bypassBtn_.getToggleState();
+    const float cardAlpha = on ? 1.0f : 0.40f;
 
-    g.setColour(bg);
+    g.setColour(bg.withAlpha(cardAlpha));
     g.fillRoundedRectangle(r, 6.0f * sc);
-    g.setColour(on ? accent_ : bd);
-    g.drawRoundedRectangle(r, 6.0f * sc, on ? 1.6f * sc : 1.0f * sc);
+
+    // Border highlights ONLY on hover or when active (no persistent focus outline!)
+    const auto borderCol = isHovered_ ? accent_ : (on ? accent_.withAlpha(0.65f) : bd.withAlpha(0.45f));
+    g.setColour(borderCol);
+    g.drawRoundedRectangle(r, 6.0f * sc, isHovered_ ? 1.8f * sc : 1.1f * sc);
 
     // Top accent bar + drag grip
-    g.setColour(accent_.withAlpha(on ? 0.90f : 0.30f));
+    g.setColour(accent_.withAlpha(on ? 0.90f : 0.28f));
     g.fillRoundedRectangle(r.getX(), r.getY(), r.getWidth(), 4.0f * sc, 2.0f * sc);
 
-    g.setColour(tx.withAlpha(0.88f));
+    g.setColour(tx.withAlpha(on ? 0.90f : 0.40f));
     g.setFont(KalyxTheme::makeFont(10.5f * sc, juce::Font::bold));
     g.drawFittedText(":: " + title_, r.reduced(6.0f * sc, 5.0f * sc).withHeight(18.0f * sc).toNearestInt(),
                      juce::Justification::centredLeft, 1);
@@ -198,33 +237,45 @@ void PedalCardComponent::resized()
     bypassBtn_.setBounds(top.removeFromRight(static_cast<int>(48.0f * sc)).reduced(0, 1));
     r.removeFromTop(static_cast<int>(4.0f * sc));
 
+    // Equidistant FlexBox layout for all controls inside the pedal card
+    juce::FlexBox fb;
+    fb.flexDirection  = juce::FlexBox::Direction::column;
+    fb.justifyContent = juce::FlexBox::JustifyContent::spaceBetween;
+    fb.alignItems     = juce::FlexBox::AlignItems::stretch;
+
     if (syncBtn_ != nullptr && pill_ != nullptr)
     {
-        auto row = r.removeFromTop(static_cast<int>(20.0f * sc));
-        syncBtn_->setBounds(row.removeFromLeft(static_cast<int>(54.0f * sc)));
-        row.removeFromLeft(4);
-        pill_->setBounds(row);
+        // Keep syncBtn + pill in a top row
+        auto syncRow = r.removeFromTop(static_cast<int>(22.0f * sc));
+        syncBtn_->setBounds(syncRow.removeFromLeft(static_cast<int>(54.0f * sc)));
+        syncRow.removeFromLeft(4);
+        pill_->setBounds(syncRow);
         r.removeFromTop(static_cast<int>(4.0f * sc));
     }
     else if (pill_ != nullptr)
     {
-        pill_->setBounds(r.removeFromTop(static_cast<int>(20.0f * sc)));
-        r.removeFromTop(static_cast<int>(4.0f * sc));
+        fb.items.add(juce::FlexItem(*pill_).withHeight(22.0f * sc));
     }
 
     if (pad2d_ != nullptr)
-    {
-        const int padH = std::max(44, r.getHeight() - static_cast<int>(bars_.size()) * static_cast<int>(24.0f * sc));
-        pad2d_->setBounds(r.removeFromTop(padH));
-        r.removeFromTop(static_cast<int>(3.0f * sc));
-    }
+        fb.items.add(juce::FlexItem(*pad2d_).withFlex(1.3f).withMinHeight(44.0f * sc).withMargin({ 2.0f * sc, 0.0f, 2.0f * sc, 0.0f }));
 
-    const int barH = static_cast<int>(21.0f * sc);
     for (auto& b : bars_)
-    {
-        b->setBounds(r.removeFromTop(barH));
-        r.removeFromTop(static_cast<int>(3.0f * sc));
-    }
+        fb.items.add(juce::FlexItem(*b).withFlex(1.0f).withMinHeight(21.0f * sc).withMaxHeight(28.0f * sc).withMargin({ 1.5f * sc, 0.0f, 1.5f * sc, 0.0f }));
+
+    fb.performLayout(r);
+}
+
+void PedalCardComponent::mouseEnter(const juce::MouseEvent&)
+{
+    isHovered_ = true;
+    repaint();
+}
+
+void PedalCardComponent::mouseExit(const juce::MouseEvent&)
+{
+    isHovered_ = false;
+    repaint();
 }
 
 void PedalCardComponent::mouseDown(const juce::MouseEvent& e)
@@ -391,6 +442,8 @@ void PedalboardView::syncOrderFromAPVTS()
 
     preZone_.setCards(preCards);
     postZone_.setCards(postCards);
+    for (auto& c : cards_)
+        if (c) c->updateBypassVisuals();
 }
 
 void PedalboardView::handleDrop(int pedalId, bool toPost, int targetIndex)

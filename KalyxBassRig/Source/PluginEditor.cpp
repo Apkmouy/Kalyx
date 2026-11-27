@@ -15,31 +15,60 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
 
     // Header
     tunerMuteBtn_.setClickingTogglesState(true);
+    tunerMuteBtn_.setWantsKeyboardFocus(false);
+    tunerMuteBtn_.setTooltip("Coupe la sortie audio pendant l'accordage.");
     tunerMuteAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "tuner_mute", tunerMuteBtn_);
     addAndMakeVisible(tunerMuteBtn_);
+    tunerBar_.setTooltip("Accordeur chromatique haute précision (détection YIN temps réel).");
     addAndMakeVisible(tunerBar_);
 
-    presetBox_.addItemList(proc_.getPresetManager().getAllPresetNames(), 1);
-    presetBox_.setSelectedId(1, juce::dontSendNotification);
+    refreshPresetList();
+    presetBox_.setWantsKeyboardFocus(false);
+    presetBox_.setTooltip("Sélecteur de presets usine et utilisateur.");
     presetBox_.onChange = [this]()
     {
         const int idx = presetBox_.getSelectedItemIndex();
-        if (idx >= 0) proc_.getPresetManager().loadPresetByIndex(idx);
+        if (idx >= 0)
+        {
+            proc_.getPresetManager().loadPresetByIndex(idx);
+            pedalboardView_.syncOrderFromAPVTS();
+        }
     };
     addAndMakeVisible(presetBox_);
 
-    abBtn_.onClick = [this]()
+    savePresetBtn_.setWantsKeyboardFocus(false);
+    savePresetBtn_.setTooltip("Enregistre les modifications dans le preset utilisateur actif.");
+    savePresetBtn_.onClick = [this]()
     {
-        const int nextSlot = 1 - proc_.getPresetManager().getActiveSlot();
-        proc_.getPresetManager().switchSlotAB(nextSlot);
-        abBtn_.setButtonText(nextSlot == 0 ? "SLOT A" : "SLOT B");
+        if (proc_.getPresetManager().isUserPreset(presetBox_.getSelectedItemIndex()))
+            proc_.getPresetManager().saveCurrentPreset();
+        else
+            promptPresetName(false);
     };
-    abBtn_.setButtonText("SLOT A");
-    addAndMakeVisible(abBtn_);
+    addAndMakeVisible(savePresetBtn_);
 
-    copyBtn_.onClick = [this]() { proc_.getPresetManager().copyAToB(); };
-    addAndMakeVisible(copyBtn_);
+    saveAsPresetBtn_.setWantsKeyboardFocus(false);
+    saveAsPresetBtn_.setTooltip("Enregistre la configuration actuelle sous un nouveau nom de preset.");
+    saveAsPresetBtn_.onClick = [this]() { promptPresetName(false); };
+    addAndMakeVisible(saveAsPresetBtn_);
 
+    renamePresetBtn_.setWantsKeyboardFocus(false);
+    renamePresetBtn_.setTooltip("Renomme le preset utilisateur sélectionné.");
+    renamePresetBtn_.onClick = [this]() { promptPresetName(true); };
+    addAndMakeVisible(renamePresetBtn_);
+
+    deletePresetBtn_.setWantsKeyboardFocus(false);
+    deletePresetBtn_.setTooltip("Supprime le preset utilisateur sélectionné.");
+    deletePresetBtn_.onClick = [this]()
+    {
+        const int idx = presetBox_.getSelectedItemIndex();
+        if (proc_.getPresetManager().deleteUserPreset(idx))
+            refreshPresetList();
+    };
+    addAndMakeVisible(deletePresetBtn_);
+
+    themeBtn_.setWantsKeyboardFocus(false);
+    themeBtn_.setTooltip("Bascule entre le mode Nuit (#111318) et le mode Jour (#E6E8EC).");
     themeBtn_.onClick = [this]()
     {
         const int cur = static_cast<int>(proc_.getAPVTS().getRawParameterValue("ui_theme")->load(std::memory_order_relaxed));
@@ -48,8 +77,12 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
     };
     addAndMakeVisible(themeBtn_);
 
+    settingsBtn_.setWantsKeyboardFocus(false);
+    settingsBtn_.setTooltip("Ouvre les paramètres (Calibration 0 VU, Oversampling).");
     settingsBtn_.onClick = [this]() { settingsOverlay_.setVisible(true); settingsOverlay_.toFront(true); };
     addAndMakeVisible(settingsBtn_);
+
+    addMouseListener(this, true);
 
     rigTabBtn_.setClickingTogglesState(true);
     pedalsTabBtn_.setClickingTogglesState(true);
@@ -244,8 +277,84 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
 
 KalyxBassRigEditor::~KalyxBassRigEditor()
 {
+    removeMouseListener(this);
     stopTimer();
     setLookAndFeel(nullptr);
+}
+
+void KalyxBassRigEditor::refreshPresetList()
+{
+    presetBox_.clear(juce::dontSendNotification);
+    presetBox_.addItemList(proc_.getPresetManager().getAllPresetNames(), 1);
+    const int idx = std::clamp(proc_.getPresetManager().getCurrentPresetIndex(), 0, std::max(0, presetBox_.getNumItems() - 1));
+    presetBox_.setSelectedItemIndex(idx, juce::dontSendNotification);
+}
+
+void KalyxBassRigEditor::promptPresetName(bool isRename)
+{
+    const int curIdx = presetBox_.getSelectedItemIndex();
+    if (isRename && !proc_.getPresetManager().isUserPreset(curIdx))
+    {
+        infoBarText_ = "Info : Seuls les presets utilisateur peuvent être renommés.";
+        repaint();
+        return;
+    }
+
+    auto* aw = new juce::AlertWindow(isRename ? "Renommer le Preset" : "Enregistrer sous...",
+                                     "Nom du preset :", juce::MessageBoxIconType::NoIcon, this);
+    aw->addTextEditor("name", isRename ? proc_.getPresetManager().getCurrentPresetName() : "My Bass Rig", "Nom :");
+    aw->addButton("OK", 1, juce::KeyPress(juce::KeyPress::returnKey));
+    aw->addButton("Annuler", 0, juce::KeyPress(juce::KeyPress::escapeKey));
+    aw->enterModalState(true, juce::ModalCallbackFunction::create([this, aw, isRename, curIdx](int res)
+    {
+        if (res == 1)
+        {
+            const auto name = aw->getTextEditorContents("name").trim();
+            if (name.isNotEmpty())
+            {
+                if (isRename) proc_.getPresetManager().renameUserPreset(curIdx, name);
+                else          proc_.getPresetManager().saveUserPreset(name);
+                refreshPresetList();
+            }
+        }
+    }), true);
+}
+
+void KalyxBassRigEditor::mouseEnter(const juce::MouseEvent& e)
+{
+    updateInfoFromComponent(e.eventComponent);
+}
+
+void KalyxBassRigEditor::mouseMove(const juce::MouseEvent& e)
+{
+    updateInfoFromComponent(e.eventComponent);
+}
+
+void KalyxBassRigEditor::updateInfoFromComponent(juce::Component* comp)
+{
+    juce::String nextText;
+    for (auto* c = comp; c != nullptr && c != this; c = c->getParentComponent())
+    {
+        if (auto* ttc = dynamic_cast<juce::TooltipClient*>(c))
+        {
+            const auto tip = ttc->getTooltip();
+            if (tip.isNotEmpty())
+            {
+                nextText = tip;
+                if (auto* bar = dynamic_cast<kalyx::bass::ui::TactileFaderBar*>(c))
+                    nextText += " [" + bar->getFormattedValue() + "]";
+                else if (auto* sl = dynamic_cast<juce::Slider*>(c))
+                    nextText += " [" + juce::String(sl->getValue(), 1) + "]";
+                break;
+            }
+        }
+    }
+
+    if (nextText.isNotEmpty() && nextText != infoBarText_)
+    {
+        infoBarText_ = nextText;
+        repaint(0, getHeight() - static_cast<int>(28.0f * uiScale_), getWidth(), static_cast<int>(28.0f * uiScale_));
+    }
 }
 
 void KalyxBassRigEditor::openCustomIRChooser(int cabSlot)
@@ -386,36 +495,52 @@ void KalyxBassRigEditor::paint(juce::Graphics& g)
     g.setFont(KalyxTheme::makeMonoFont(10.5f * sc, juce::Font::bold));
     g.drawFittedText("v1.0.0", badgeR.toNearestInt(), juce::Justification::centred, 1);
 
-    // 4 Main Panels
-    auto body = getLocalBounds().withTrimmedTop(hdrH + pad).reduced(pad, 0).withTrimmedBottom(pad);
-    const int leftW  = static_cast<int>(260.0f * sc);
-    const int rightW = static_cast<int>(255.0f * sc);
-    const auto leftR  = body.removeFromLeft(leftW);
-    body.removeFromLeft(pad);
-    const auto rightR = body.removeFromRight(rightW);
-    body.removeFromRight(pad);
-    auto ampR = body.removeFromTop(static_cast<int>(body.getHeight() * 0.56f));
-    body.removeFromTop(pad);
-    const auto cabR = body;
-
-    auto drawCard = [&](juce::Rectangle<int> area, const juce::String& title)
+    // 4 Main Panels (above bottom InfoBar)
+    const int infoH = static_cast<int>(25.0f * sc);
+    if (!showPedalboard_)
     {
-        auto rf = area.toFloat();
-        g.setColour(stripBg);
-        g.fillRoundedRectangle(rf, 6.0f * sc);
-        g.setColour(border);
-        g.drawRoundedRectangle(rf, 6.0f * sc, 1.2f * sc);
-        g.setColour(textCol.withAlpha(0.70f));
-        g.setFont(KalyxTheme::makeFont(11.0f * sc, juce::Font::bold));
-        g.drawFittedText(title, area.reduced(static_cast<int>(10.0f * sc), static_cast<int>(6.0f * sc))
-                                    .withHeight(static_cast<int>(18.0f * sc)),
-                         juce::Justification::centredLeft, 1);
-    };
+        auto body = getLocalBounds().withTrimmedTop(hdrH + pad).withTrimmedBottom(infoH + pad).reduced(pad, 0);
+        const int leftW  = static_cast<int>(260.0f * sc);
+        const int rightW = static_cast<int>(255.0f * sc);
+        const auto leftR  = body.removeFromLeft(leftW);
+        body.removeFromLeft(pad);
+        const auto rightR = body.removeFromRight(rightW);
+        body.removeFromRight(pad);
+        auto ampR = body.removeFromTop(static_cast<int>(body.getHeight() * 0.56f));
+        body.removeFromTop(pad);
+        const auto cabR = body;
 
-    drawCard(leftR, "INPUT & DI PATH");
-    drawCard(ampR, "TUBE AMP HEAD (64-BIT)");
-    drawCard(cabR, "DUAL CABINET IR & MIC 2D");
-    drawCard(rightR, "MASTER & MIXER");
+        auto drawCard = [&](juce::Rectangle<int> area, const juce::String& title)
+        {
+            auto rf = area.toFloat();
+            g.setColour(stripBg);
+            g.fillRoundedRectangle(rf, 6.0f * sc);
+            g.setColour(border);
+            g.drawRoundedRectangle(rf, 6.0f * sc, 1.2f * sc);
+            g.setColour(textCol.withAlpha(0.70f));
+            g.setFont(KalyxTheme::makeFont(11.0f * sc, juce::Font::bold));
+            g.drawFittedText(title, area.reduced(static_cast<int>(10.0f * sc), static_cast<int>(6.0f * sc))
+                                        .withHeight(static_cast<int>(18.0f * sc)),
+                             juce::Justification::centredLeft, 1);
+        };
+
+        drawCard(leftR, "INPUT & DI PATH");
+        drawCard(ampR, "TUBE AMP HEAD (64-BIT)");
+        drawCard(cabR, "DUAL CABINET IR & MIC 2D");
+        drawCard(rightR, "MASTER & MIXER");
+    }
+
+    // Bottom Contextual InfoBar (25px * uiScale)
+    auto infoR = juce::Rectangle<float>(0.0f, static_cast<float>(getHeight() - infoH),
+                                        static_cast<float>(getWidth()), static_cast<float>(infoH));
+    g.setColour(stripBg);
+    g.fillRect(infoR);
+    g.setColour(border);
+    g.drawLine(0.0f, infoR.getY(), infoR.getRight(), infoR.getY(), 1.0f * sc);
+    g.setColour(textCol.withAlpha(0.82f));
+    g.setFont(KalyxTheme::makeMonoFont(10.5f * sc, juce::Font::plain));
+    g.drawFittedText(infoBarText_, infoR.reduced(12.0f * sc, 2.0f * sc).toNearestInt(),
+                     juce::Justification::centredLeft, 1);
 }
 
 void KalyxBassRigEditor::resized()
@@ -460,36 +585,39 @@ void KalyxBassRigEditor::resized()
     settingsOverlay_.setUiScale(sc);
     settingsOverlay_.setBounds(getLocalBounds());
 
-    const int pad  = static_cast<int>(10.0f * sc);
-    const int hdrH = static_cast<int>(46.0f * sc);
-    pedalboardView_.setBounds(0, hdrH, getWidth(), getHeight() - hdrH);
+    const int pad   = static_cast<int>(10.0f * sc);
+    const int hdrH  = static_cast<int>(46.0f * sc);
+    const int infoH = static_cast<int>(25.0f * sc);
+    pedalboardView_.setBounds(0, hdrH, getWidth(), getHeight() - hdrH - infoH);
 
     // Header layout
-    int hx = static_cast<int>(258.0f * sc);
-    const int tunerW = static_cast<int>(240.0f * sc);
+    int hx = static_cast<int>(256.0f * sc);
+    const int tunerW = static_cast<int>(220.0f * sc);
     tunerBar_.setBounds(hx, static_cast<int>(8.0f * sc), tunerW, static_cast<int>(30.0f * sc));
-    hx += tunerW + static_cast<int>(5.0f * sc);
-    tunerMuteBtn_.setBounds(hx, static_cast<int>(10.0f * sc), static_cast<int>(48.0f * sc), static_cast<int>(26.0f * sc));
-    hx += static_cast<int>(56.0f * sc);
-    rigTabBtn_.setBounds(hx, static_cast<int>(10.0f * sc), static_cast<int>(48.0f * sc), static_cast<int>(26.0f * sc));
-    hx += static_cast<int>(52.0f * sc);
-    pedalsTabBtn_.setBounds(hx, static_cast<int>(10.0f * sc), static_cast<int>(64.0f * sc), static_cast<int>(26.0f * sc));
+    hx += tunerW + static_cast<int>(3.0f * sc);
+    tunerMuteBtn_.setBounds(hx, static_cast<int>(10.0f * sc), static_cast<int>(84.0f * sc), static_cast<int>(26.0f * sc));
+    hx += static_cast<int>(92.0f * sc);
+    rigTabBtn_.setBounds(hx, static_cast<int>(10.0f * sc), static_cast<int>(46.0f * sc), static_cast<int>(26.0f * sc));
+    hx += static_cast<int>(50.0f * sc);
+    pedalsTabBtn_.setBounds(hx, static_cast<int>(10.0f * sc), static_cast<int>(62.0f * sc), static_cast<int>(26.0f * sc));
 
     int rx = getWidth() - pad;
     auto placeRight = [&](juce::Component& c, int w)
     {
         rx -= w;
         c.setBounds(rx, static_cast<int>(10.0f * sc), w, static_cast<int>(26.0f * sc));
-        rx -= static_cast<int>(6.0f * sc);
+        rx -= static_cast<int>(4.0f * sc);
     };
-    placeRight(settingsBtn_, static_cast<int>(76.0f * sc));
-    placeRight(themeBtn_, static_cast<int>(58.0f * sc));
-    placeRight(copyBtn_, static_cast<int>(54.0f * sc));
-    placeRight(abBtn_, static_cast<int>(68.0f * sc));
-    placeRight(presetBox_, static_cast<int>(220.0f * sc));
+    placeRight(settingsBtn_, static_cast<int>(72.0f * sc));
+    placeRight(themeBtn_, static_cast<int>(52.0f * sc));
+    placeRight(deletePresetBtn_, static_cast<int>(40.0f * sc));
+    placeRight(renamePresetBtn_, static_cast<int>(40.0f * sc));
+    placeRight(saveAsPresetBtn_, static_cast<int>(60.0f * sc));
+    placeRight(savePresetBtn_, static_cast<int>(46.0f * sc));
+    placeRight(presetBox_, static_cast<int>(200.0f * sc));
 
     // Main body
-    auto body = getLocalBounds().withTrimmedTop(hdrH + pad).reduced(pad, 0).withTrimmedBottom(pad);
+    auto body = getLocalBounds().withTrimmedTop(hdrH + pad).withTrimmedBottom(infoH + pad).reduced(pad, 0);
     const int leftW  = static_cast<int>(260.0f * sc);
     const int rightW = static_cast<int>(255.0f * sc);
     auto leftR  = body.removeFromLeft(leftW).reduced(static_cast<int>(10.0f * sc));

@@ -14,7 +14,8 @@ void KalyxRotaryControl::init(juce::Component& parent,
                               bool isBipolar,
                               bool isDarkText,
                               double defaultVal,
-                              std::function<juce::String(double)> fmt)
+                              std::function<juce::String(double)> fmt,
+                              const juce::String& infoHint)
 {
     arcColour = accent;
     darkText  = isDarkText;
@@ -27,6 +28,9 @@ void KalyxRotaryControl::init(juce::Component& parent,
     slider.getProperties().set("kalyxBipolar", isBipolar);
     slider.setVelocityBasedMode(false);
     slider.setMouseDragSensitivity(130);
+    slider.setWantsKeyboardFocus(false);
+    if (infoHint.isNotEmpty())
+        slider.setTooltip(infoHint);
     parent.addAndMakeVisible(slider);
 
     titleLabel.setText(title, juce::dontSendNotification);
@@ -111,7 +115,8 @@ void TactileFaderBar::init(juce::Component& parent,
                            bool bipolar,
                            bool darkText,
                            double defaultVal,
-                           std::function<juce::String(double)> fmt)
+                           std::function<juce::String(double)> fmt,
+                           const juce::String& infoHint)
 {
     title_      = title;
     accent_     = accent;
@@ -120,6 +125,9 @@ void TactileFaderBar::init(juce::Component& parent,
     defaultVal_ = defaultVal;
     fmt_        = std::move(fmt);
     param_      = apvts.getParameter(paramID);
+    setWantsKeyboardFocus(false);
+    if (infoHint.isNotEmpty())
+        setTooltip(infoHint);
 
     if (param_ != nullptr)
     {
@@ -131,6 +139,11 @@ void TactileFaderBar::init(juce::Component& parent,
         att_->sendInitialUpdate();
     }
     parent.addAndMakeVisible(*this);
+}
+
+juce::String TactileFaderBar::getFormattedValue() const
+{
+    return fmt_ ? fmt_(currentVal_) : juce::String(currentVal_, 1);
 }
 
 void TactileFaderBar::setThemeColours(juce::Colour accent, bool darkText) noexcept
@@ -146,6 +159,7 @@ void TactileFaderBar::paint(juce::Graphics& g)
     const auto r = getLocalBounds().toFloat().reduced(1.0f * sc);
     const float alpha = dimmed_ ? 0.35f : 1.0f;
 
+    // Outer housing
     const auto bgCol = darkText_ ? KalyxTheme::dayControlIdleBg : KalyxTheme::nightControlIdleBg;
     const auto bdCol = darkText_ ? KalyxTheme::dayGridBorder : KalyxTheme::nightGridBorder;
     g.setColour(bgCol.withAlpha(alpha));
@@ -153,35 +167,53 @@ void TactileFaderBar::paint(juce::Graphics& g)
     g.setColour(bdCol.withAlpha(alpha));
     g.drawRoundedRectangle(r, 4.0f * sc, 1.0f * sc);
 
+    // Hardware recessed rail/track at the bottom half of the bar
+    const auto railR = juce::Rectangle<float>(r.getX() + 4.0f * sc, r.getBottom() - 6.5f * sc,
+                                              std::max(10.0f, r.getWidth() - 8.0f * sc), 3.5f * sc);
+    const auto railBg = darkText_ ? KalyxTheme::dayKnobTrackBg : KalyxTheme::nightChassisBg;
+    g.setColour(railBg.withAlpha(alpha));
+    g.fillRoundedRectangle(railR, 1.8f * sc);
+
     if (param_ != nullptr)
     {
         const float norm = param_->convertTo0to1(static_cast<float>(currentVal_));
-        const auto fillCol = (dimmed_ ? juce::Colours::grey : accent_).withAlpha(0.42f * alpha);
+        const auto fillCol = (dimmed_ ? juce::Colours::grey : accent_).withAlpha(alpha);
         g.setColour(fillCol);
+        float headX = railR.getX();
         if (bipolar_)
         {
-            const float cx = r.getCentreX();
-            const float vx = r.getX() + norm * r.getWidth();
-            const auto fillR = juce::Rectangle<float>(std::min(cx, vx), r.getY() + 1.0f,
-                                                      std::abs(vx - cx), r.getHeight() - 2.0f);
-            g.fillRoundedRectangle(fillR, 3.0f * sc);
+            const float cx = railR.getCentreX();
+            const float vx = railR.getX() + norm * railR.getWidth();
+            headX = vx;
+            const auto fillR = juce::Rectangle<float>(std::min(cx, vx), railR.getY(),
+                                                      std::max(1.5f, std::abs(vx - cx)), railR.getHeight());
+            g.fillRoundedRectangle(fillR, 1.5f * sc);
+            g.setColour((darkText_ ? KalyxTheme::dayTextPrimary : KalyxTheme::nightTextPrimary).withAlpha(0.35f * alpha));
+            g.drawLine(cx, railR.getY() - 1.0f * sc, cx, railR.getBottom() + 1.0f * sc, 1.0f * sc);
         }
         else
         {
-            const auto fillR = r.withWidth(std::max(2.0f, norm * r.getWidth())).reduced(1.0f);
-            g.fillRoundedRectangle(fillR, 3.0f * sc);
+            const float fw = std::max(2.0f, norm * railR.getWidth());
+            headX = railR.getX() + fw;
+            const auto fillR = railR.withWidth(fw);
+            g.fillRoundedRectangle(fillR, 1.5f * sc);
         }
+
+        // Crisp head demarcation cap
+        g.setColour((darkText_ ? KalyxTheme::dayTextPrimary : KalyxTheme::nightTextPrimary).withAlpha(0.92f * alpha));
+        g.fillRoundedRectangle(headX - 1.5f * sc, railR.getY() - 1.5f * sc, 3.0f * sc, railR.getHeight() + 3.0f * sc, 1.0f * sc);
     }
 
     const auto textCol = (darkText_ ? KalyxTheme::dayTextPrimary : KalyxTheme::nightTextPrimary).withAlpha(alpha);
-    g.setColour(textCol.withAlpha(0.80f * alpha));
-    g.setFont(KalyxTheme::makeFont(10.5f * sc, juce::Font::bold));
-    g.drawFittedText(title_, r.reduced(6.0f * sc, 0.0f).toNearestInt(), juce::Justification::centredLeft, 1);
+    const auto textArea = r.withTrimmedBottom(6.5f * sc).reduced(5.0f * sc, 0.0f);
+    g.setColour(textCol.withAlpha(0.82f * alpha));
+    g.setFont(KalyxTheme::makeFont(9.5f * sc, juce::Font::bold));
+    g.drawFittedText(title_, textArea.toNearestInt(), juce::Justification::centredLeft, 1);
 
-    const juce::String valStr = fmt_ ? fmt_(currentVal_) : juce::String(currentVal_, 1);
+    const juce::String valStr = getFormattedValue();
     g.setColour(textCol);
-    g.setFont(KalyxTheme::makeMonoFont(11.0f * sc, juce::Font::plain));
-    g.drawFittedText(valStr, r.reduced(6.0f * sc, 0.0f).toNearestInt(), juce::Justification::centredRight, 1);
+    g.setFont(KalyxTheme::makeMonoFont(10.0f * sc, juce::Font::plain));
+    g.drawFittedText(valStr, textArea.toNearestInt(), juce::Justification::centredRight, 1);
 }
 
 void TactileFaderBar::resized()

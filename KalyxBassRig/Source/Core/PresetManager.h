@@ -14,14 +14,13 @@ public:
     [[nodiscard]] juce::StringArray getAllPresetNames() const;
     [[nodiscard]] int getCurrentPresetIndex() const noexcept { return currentIndex_; }
     [[nodiscard]] juce::String getCurrentPresetName() const;
+    [[nodiscard]] bool isUserPreset(int index) const;
 
     void loadPresetByIndex(int index);
+    bool saveCurrentPreset();
     bool saveUserPreset(const juce::String& name);
-
-    // A/B state comparison
-    void switchSlotAB(int slot); // 0 = A, 1 = B
-    void copyAToB();
-    [[nodiscard]] int getActiveSlot() const noexcept { return activeSlot_; }
+    bool renameUserPreset(int index, const juce::String& newName);
+    bool deleteUserPreset(int index);
 
 private:
     void applyFactoryPreset(int factoryIdx);
@@ -32,9 +31,6 @@ private:
     juce::StringArray factoryNames_;
     mutable juce::StringArray userNames_;
     int currentIndex_ { 0 };
-
-    int activeSlot_ { 0 };
-    std::array<juce::ValueTree, 2> slotStates_;
 };
 
 } // namespace kalyx::bass::core

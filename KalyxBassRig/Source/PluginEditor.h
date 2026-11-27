@@ -17,26 +17,34 @@ public:
 
     void paint(juce::Graphics& g) override;
     void resized() override;
+    void mouseEnter(const juce::MouseEvent& e) override;
+    void mouseMove(const juce::MouseEvent& e) override;
 
 private:
     void timerCallback() override;
     void applyTheme();
     void updateAmpModelVisibility();
     void openCustomIRChooser(int cabSlot);
+    void refreshPresetList();
+    void promptPresetName(bool isRename);
+    void updateInfoFromComponent(juce::Component* comp);
 
     KalyxBassRigProcessor& proc_;
     KalyxBassLookAndFeel lnf_;
     float uiScale_ { 1.0f };
     kalyx::bass::ChassisTheme theme_ { kalyx::bass::ChassisTheme::Night };
     int lastModelIdx_ { -1 };
+    juce::String infoBarText_ { "Kalyx Bass Rig v1.0.0 — Survolez un contrôle pour afficher son aide et sa valeur exacte." };
 
     // Header
-    juce::TextButton tunerMuteBtn_ { "MUTE" };
+    juce::TextButton tunerMuteBtn_ { "TUNER MUTE" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> tunerMuteAtt_;
     kalyx::bass::ui::StrobeTunerBar tunerBar_;
     juce::ComboBox presetBox_;
-    juce::TextButton abBtn_ { "A / B" };
-    juce::TextButton copyBtn_ { "COPY" };
+    juce::TextButton savePresetBtn_ { "SAVE" };
+    juce::TextButton saveAsPresetBtn_ { "SAVE AS" };
+    juce::TextButton renamePresetBtn_ { "REN" };
+    juce::TextButton deletePresetBtn_ { "DEL" };
     juce::TextButton themeBtn_ { "DAY" };
     juce::TextButton settingsBtn_ { "SETTINGS" };
     juce::TextButton rigTabBtn_ { "RIG" };

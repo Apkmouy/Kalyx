@@ -9,7 +9,8 @@
 namespace kalyx::bass::ui
 {
 
-class StrobeTunerBar final : public juce::Component
+class StrobeTunerBar final : public juce::Component,
+                             public juce::SettableTooltipClient
 {
 public:
     explicit StrobeTunerBar(KalyxBassRigProcessor& proc);
