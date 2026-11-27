@@ -101,7 +101,7 @@ class KalyxBassLookAndFeel final : public juce::LookAndFeel_V4
 public:
     KalyxBassLookAndFeel() = default;
 
-    void setChassisTheme(kalyx::bass::ChassisTheme t) noexcept { theme_ = t; }
+    void setChassisTheme(kalyx::bass::ChassisTheme t) noexcept;
     [[nodiscard]] kalyx::bass::ChassisTheme getChassisTheme() const noexcept { return theme_; }
 
     void setUiScale(float s) noexcept { uiScale_ = std::clamp(s, 0.75f, 2.20f); }

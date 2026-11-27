@@ -64,8 +64,11 @@ public:
     [[nodiscard]] float getTunerCents() const noexcept { return tuner_.getCents(); }
     [[nodiscard]] float getTunerConf() const noexcept { return tuner_.getConfidence(); }
 
+    static constexpr int kFFTSize = 2048;
+
     [[nodiscard]] kalyx::bass::dsp::AmpControlState getAmpSnapshot() const noexcept;
     [[nodiscard]] double getCurrentSampleRate() const noexcept { return hostSampleRate_; }
+    void copyPostAmpFFT(float* dest2048) noexcept;
 
     void triggerIRReload(int cabSlot, int irIndex);
     void loadCustomIR(int cabSlot, const juce::File& file);
@@ -82,6 +85,9 @@ private:
     kalyx::bass::dsp::DualCabEngine    dualCab_;
     kalyx::bass::dsp::SmartKickRelief64 kickRelief_;
     kalyx::bass::dsp::BrickwallLimiter64 limiter_;
+
+    std::array<float, kFFTSize> fftRing_ {};
+    std::atomic<int> fftWriteIdx_ { 0 };
 
     // Pre-allocated work buffers (zero allocation in processBlock)
     std::vector<double> preMonoBuf_;

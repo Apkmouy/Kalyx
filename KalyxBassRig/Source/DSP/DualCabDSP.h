@@ -25,7 +25,13 @@ struct CabControlState
     int     cabAIndex    { 0 };
     int     cabBIndex    { 8 };
     bool    phaseA       { false };
+    bool    muteA        { false };
+    bool    soloA        { false };
+    double  panAPct      { 0.0 };  // -100..+100
     bool    phaseB       { false };
+    bool    muteB        { false };
+    bool    soloB        { false };
+    double  panBPct      { 0.0 };  // -100..+100
     double  mixPct       { 35.0 }; // 0=100% A, 100=100% B
     bool    autoPhase    { true };
     double  breakupPct   { 18.0 }; // Speaker Excursion / Breakup

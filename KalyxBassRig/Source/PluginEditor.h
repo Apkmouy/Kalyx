@@ -34,12 +34,12 @@ private:
     float uiScale_ { 1.0f };
     kalyx::bass::ChassisTheme theme_ { kalyx::bass::ChassisTheme::Night };
     int lastModelIdx_ { -1 };
-    juce::String infoBarText_ { "Kalyx Bass Rig v1.0.0 — Survolez un contrôle pour afficher son aide et sa valeur exacte." };
+    juce::String infoBarText_ { juce::String::fromUTF8("Kalyx Bass Rig v1.0.0 — Survolez un contrôle pour afficher son aide et sa valeur exacte.") };
 
     // Header
+    juce::TextButton tunerBtn_ { "TUNER" };
     juce::TextButton tunerMuteBtn_ { "TUNER MUTE" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> tunerMuteAtt_;
-    kalyx::bass::ui::StrobeTunerBar tunerBar_;
     juce::ComboBox presetBox_;
     juce::TextButton savePresetBtn_ { "SAVE" };
     juce::TextButton saveAsPresetBtn_ { "SAVE AS" };
@@ -52,11 +52,12 @@ private:
     bool showPedalboard_ { false };
     kalyx::bass::ui::PedalboardView pedalboardView_;
 
-    // Left Column: Input & DI Path
+    // Left Column: Input Stage & DI Path
     kalyx::bass::ui::KalyxRotaryControl inTrimKnob_;
     juce::ToggleButton padBtn_ { "PAD -15" };
     juce::ToggleButton gateBtn_ { "GATE" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> padAtt_, gateAtt_;
+    kalyx::bass::ui::TactileFaderBar gateThreshBar_;
     kalyx::bass::ui::NoiseGateCurveWidget gateCurve_;
 
     juce::ToggleButton diEnBtn_ { "DI PATH" };
@@ -90,8 +91,11 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> cabEnAtt_;
     juce::ComboBox cabABox_, cabBBox_;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> cabAAtt_, cabBAtt_;
-    juce::ToggleButton phaseABtn_ { "O A" }, phaseBBtn_ { "O B" }, cabAutoPhaseBtn_ { "AUTO PHASE" };
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> phaseAAtt_, phaseBAtt_, cabAutoPhaseAtt_;
+    juce::ToggleButton phaseABtn_ { juce::String::fromUTF8("Ø INVERT") }, phaseBBtn_ { juce::String::fromUTF8("Ø INVERT") };
+    juce::ToggleButton muteABtn_ { "MUTE" }, soloABtn_ { "SOLO" }, muteBBtn_ { "MUTE" }, soloBBtn_ { "SOLO" };
+    juce::ToggleButton cabAutoPhaseBtn_ { "AUTO PHASE" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> phaseAAtt_, phaseBAtt_, muteAAtt_, soloAAtt_, muteBAtt_, soloBAtt_, cabAutoPhaseAtt_;
+    kalyx::bass::ui::TactileFaderBar cabAPanBar_, cabBPanBar_;
     juce::TextButton loadIrABtn_ { "LOAD IR A" }, loadIrBBtn_ { "LOAD IR B" };
     std::unique_ptr<juce::FileChooser> fileChooser_;
 
@@ -107,7 +111,8 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> kickEnAtt_, limEnAtt_;
     kalyx::bass::ui::TactileFaderBar kickAmtBar_, limCeilBar_;
 
-    // Settings Overlay
+    // Overlays
+    kalyx::bass::ui::TunerOverlay tunerOverlay_;
     kalyx::bass::ui::SettingsOverlay settingsOverlay_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KalyxBassRigEditor)

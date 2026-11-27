@@ -3,9 +3,9 @@
 KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
     : AudioProcessorEditor(&proc),
       proc_(proc),
-      tunerBar_(proc),
       pedalboardView_(proc.getAPVTS()),
       ampGraph_(proc),
+      tunerOverlay_(proc),
       settingsOverlay_(proc)
 {
     setLookAndFeel(&lnf_);
@@ -14,17 +14,24 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
     const bool dark = false;
 
     // Header
+    tunerBtn_.setWantsKeyboardFocus(false);
+    tunerBtn_.setTooltip(juce::String::fromUTF8("Ouvre l'accordeur chromatique de précision en superposition."));
+    tunerBtn_.onClick = [this]()
+    {
+        tunerOverlay_.setVisible(true);
+        tunerOverlay_.toFront(true);
+    };
+    addAndMakeVisible(tunerBtn_);
+
     tunerMuteBtn_.setClickingTogglesState(true);
     tunerMuteBtn_.setWantsKeyboardFocus(false);
-    tunerMuteBtn_.setTooltip("Coupe la sortie audio pendant l'accordage.");
+    tunerMuteBtn_.setTooltip(juce::String::fromUTF8("Coupe la sortie audio pendant l'accordage."));
     tunerMuteAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "tuner_mute", tunerMuteBtn_);
     addAndMakeVisible(tunerMuteBtn_);
-    tunerBar_.setTooltip("Accordeur chromatique haute précision (détection YIN temps réel).");
-    addAndMakeVisible(tunerBar_);
 
     refreshPresetList();
     presetBox_.setWantsKeyboardFocus(false);
-    presetBox_.setTooltip("Sélecteur de presets usine et utilisateur.");
+    presetBox_.setTooltip(juce::String::fromUTF8("Sélecteur de presets usine et utilisateur."));
     presetBox_.onChange = [this]()
     {
         const int idx = presetBox_.getSelectedItemIndex();
@@ -32,12 +39,13 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
         {
             proc_.getPresetManager().loadPresetByIndex(idx);
             pedalboardView_.syncOrderFromAPVTS();
+            ampGraph_.repaint();
         }
     };
     addAndMakeVisible(presetBox_);
 
     savePresetBtn_.setWantsKeyboardFocus(false);
-    savePresetBtn_.setTooltip("Enregistre les modifications dans le preset utilisateur actif.");
+    savePresetBtn_.setTooltip(juce::String::fromUTF8("Enregistre les modifications dans le preset utilisateur actif."));
     savePresetBtn_.onClick = [this]()
     {
         if (proc_.getPresetManager().isUserPreset(presetBox_.getSelectedItemIndex()))
@@ -48,17 +56,17 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
     addAndMakeVisible(savePresetBtn_);
 
     saveAsPresetBtn_.setWantsKeyboardFocus(false);
-    saveAsPresetBtn_.setTooltip("Enregistre la configuration actuelle sous un nouveau nom de preset.");
+    saveAsPresetBtn_.setTooltip(juce::String::fromUTF8("Enregistre la configuration actuelle sous un nouveau nom de preset."));
     saveAsPresetBtn_.onClick = [this]() { promptPresetName(false); };
     addAndMakeVisible(saveAsPresetBtn_);
 
     renamePresetBtn_.setWantsKeyboardFocus(false);
-    renamePresetBtn_.setTooltip("Renomme le preset utilisateur sélectionné.");
+    renamePresetBtn_.setTooltip(juce::String::fromUTF8("Renomme le preset utilisateur sélectionné."));
     renamePresetBtn_.onClick = [this]() { promptPresetName(true); };
     addAndMakeVisible(renamePresetBtn_);
 
     deletePresetBtn_.setWantsKeyboardFocus(false);
-    deletePresetBtn_.setTooltip("Supprime le preset utilisateur sélectionné.");
+    deletePresetBtn_.setTooltip(juce::String::fromUTF8("Supprime le preset utilisateur sélectionné."));
     deletePresetBtn_.onClick = [this]()
     {
         const int idx = presetBox_.getSelectedItemIndex();
@@ -68,7 +76,7 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
     addAndMakeVisible(deletePresetBtn_);
 
     themeBtn_.setWantsKeyboardFocus(false);
-    themeBtn_.setTooltip("Bascule entre le mode Nuit (#111318) et le mode Jour (#E6E8EC).");
+    themeBtn_.setTooltip(juce::String::fromUTF8("Bascule entre le mode Nuit (#111318) et le mode Jour (#E6E8EC)."));
     themeBtn_.onClick = [this]()
     {
         const int cur = static_cast<int>(proc_.getAPVTS().getRawParameterValue("ui_theme")->load(std::memory_order_relaxed));
@@ -78,7 +86,7 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
     addAndMakeVisible(themeBtn_);
 
     settingsBtn_.setWantsKeyboardFocus(false);
-    settingsBtn_.setTooltip("Ouvre les paramètres (Calibration 0 VU, Oversampling).");
+    settingsBtn_.setTooltip(juce::String::fromUTF8("Ouvre les paramètres (Calibration 0 VU, Oversampling)."));
     settingsBtn_.onClick = [this]() { settingsOverlay_.setVisible(true); settingsOverlay_.toFront(true); };
     addAndMakeVisible(settingsBtn_);
 
@@ -108,43 +116,65 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
     addAndMakeVisible(rigTabBtn_);
     addAndMakeVisible(pedalsTabBtn_);
 
-    // Left Column: Input & DI
+    // Left Column: Input Stage & DI Path
     inTrimKnob_.init(*this, apvts, "in_trim", "IN TRIM", KalyxTheme::kalyxRoyalBlue, true, dark, 0.0,
-                     [](double v) { return KalyxTheme::formatDbClean(v); });
+                     [](double v) { return KalyxTheme::formatDbClean(v); },
+                     juce::String::fromUTF8("Gain d'entrée global (-24 à +24 dB)."));
 
     padBtn_.setClickingTogglesState(true);
+    padBtn_.setWantsKeyboardFocus(false);
+    padBtn_.setTooltip(juce::String::fromUTF8("Atténuateur d'entrée -15 dB pour basses actives."));
     gateBtn_.setClickingTogglesState(true);
+    gateBtn_.setWantsKeyboardFocus(false);
+    gateBtn_.setTooltip(juce::String::fromUTF8("Active le Noise Gate rapide en entrée."));
     padAtt_  = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "in_pad", padBtn_);
     gateAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "gate_en", gateBtn_);
     addAndMakeVisible(padBtn_);
     addAndMakeVisible(gateBtn_);
 
+    gateThreshBar_.init(*this, apvts, "gate_thresh", "GATE THRESH", KalyxTheme::kalyxRoyalBlue, false, dark, -55.0,
+                        [](double v) { return juce::String(v, 0) + " dB"; },
+                        juce::String::fromUTF8("Seuil d'ouverture du Noise Gate (-80 à -10 dB)."));
+
     gateCurve_.init(apvts);
+    gateCurve_.setWantsKeyboardFocus(false);
+    gateCurve_.setTooltip(juce::String::fromUTF8("Courbe interactive du Noise Gate."));
     addAndMakeVisible(gateCurve_);
 
     diEnBtn_.setClickingTogglesState(true);
+    diEnBtn_.setWantsKeyboardFocus(false);
+    diEnBtn_.setTooltip(juce::String::fromUTF8("Active ou coupe la voie DI parallèle."));
     diEnAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "di_en", diEnBtn_);
     addAndMakeVisible(diEnBtn_);
 
     diCircuitBox_.addItemList({ "Transparent", "Tube DI", "American 2503", "Class-A 73", "Sub-Harmonic" }, 1);
+    diCircuitBox_.setWantsKeyboardFocus(false);
+    diCircuitBox_.setTooltip(juce::String::fromUTF8("Topologie analogique de la voie DI parallèle."));
     diCircuitAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, "di_circuit", diCircuitBox_);
     addAndMakeVisible(diCircuitBox_);
 
     diSubMixBar_.init(*this, apvts, "di_sub_mix", "SUB MIX", KalyxTheme::kalyxAubergine, false, dark, 35.0,
-                      [](double v) { return juce::String(v, 0) + "%"; });
+                      [](double v) { return juce::String(v, 0) + "%"; },
+                      juce::String::fromUTF8("Dosage du synthétiseur Sub-Harmonic (-1 Oct)."));
 
     diFilterGraph_.init(apvts);
+    diFilterGraph_.setWantsKeyboardFocus(false);
+    diFilterGraph_.setTooltip(juce::String::fromUTF8("Filtres HPF/LPF 24 dB/oct de la voie DI."));
     addAndMakeVisible(diFilterGraph_);
 
     diCompBar_.init(*this, apvts, "di_comp", "DI OPTO COMP", KalyxTheme::kalyxRoyalBlue, false, dark, 25.0,
-                    [](double v) { return juce::String(v, 0) + "%"; });
+                    [](double v) { return juce::String(v, 0) + "%"; },
+                    juce::String::fromUTF8("Compresseur optique dédié à la voie DI."));
 
     diAutoPhaseBtn_.setClickingTogglesState(true);
+    diAutoPhaseBtn_.setWantsKeyboardFocus(false);
+    diAutoPhaseBtn_.setTooltip(juce::String::fromUTF8("Aligne automatiquement la phase de la DI sur les baffles IR."));
     diAutoPhaseAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "di_auto_phase", diAutoPhaseBtn_);
     addAndMakeVisible(diAutoPhaseBtn_);
 
     // Center Top: Amp Head
     ampEnBtn_.setClickingTogglesState(true);
+    ampEnBtn_.setWantsKeyboardFocus(false);
     ampEnAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "amp_en", ampEnBtn_);
     addAndMakeVisible(ampEnBtn_);
 
@@ -160,26 +190,41 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
     addAndMakeVisible(*ampChannelPill_);
 
     brightBtn_.setClickingTogglesState(true);
+    brightBtn_.setWantsKeyboardFocus(false);
+    brightBtn_.onClick = [this]() { ampGraph_.repaint(); };
     ultraHiBtn_.setClickingTogglesState(true);
+    ultraHiBtn_.setWantsKeyboardFocus(false);
+    ultraHiBtn_.onClick = [this]() { ampGraph_.repaint(); };
     brightAtt_  = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "amp_bright", brightBtn_);
     ultraHiAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "amp_ultra_hi", ultraHiBtn_);
     addAndMakeVisible(brightBtn_);
     addAndMakeVisible(ultraHiBtn_);
 
     ultraLoBox_.addItemList({ "U-LO: OFF", "SUB CUT", "LOW CUT", "ULTRA LO", "MODERN" }, 1);
+    ultraLoBox_.setWantsKeyboardFocus(false);
+    ultraLoBox_.onChange = [this]() { ampGraph_.repaint(); };
     ultraLoAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, "amp_ultra_lo", ultraLoBox_);
     addAndMakeVisible(ultraLoBox_);
 
     midFreqBox_.addItemList({ "220 Hz", "450 Hz", "800 Hz", "1.6 kHz", "3.0 kHz" }, 1);
+    midFreqBox_.setWantsKeyboardFocus(false);
+    midFreqBox_.onChange = [this]() { ampGraph_.repaint(); };
     midFreqAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, "amp_mid_freq", midFreqBox_);
     addAndMakeVisible(midFreqBox_);
 
     depthBox_.addItemList({ "FAC 100nF", "FAC 47nF", "FAC 10nF", "FAC 4.7nF", "FAC 2.2nF", "FAC 1.0nF" }, 1);
+    depthBox_.setWantsKeyboardFocus(false);
+    depthBox_.onChange = [this]() { ampGraph_.repaint(); };
     depthAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, "amp_depth", depthBox_);
     addAndMakeVisible(depthBox_);
 
     auto fmtPct = [](double v) { return juce::String(v, 0) + "%"; };
     auto fmtDb  = [](double v) { return KalyxTheme::formatDbClean(v); };
+    auto fmtPan = [](double v)
+    {
+        if (std::abs(v) < 1.0) return juce::String("C");
+        return (v < 0 ? "L" : "R") + juce::String(std::abs(v), 0);
+    };
 
     gainKnob_.init(*this, apvts, "amp_gain", "GAIN", KalyxTheme::heritageBlue, false, dark, 42.0, fmtPct);
     bassKnob_.init(*this, apvts, "amp_bass", "BASS", KalyxTheme::heritageBlue, true, dark, 0.0, fmtDb);
@@ -194,8 +239,9 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
     biasBar_.init(*this, apvts, "amp_bias", "TUBE BIAS", KalyxTheme::kalyxAubergine, true, dark, 0.0,
                  [](double v) { return (v >= 0.5 ? "+" : "") + juce::String(v, 0) + "%"; });
 
-    // Center Bottom: Dual Cabinet & Mic 2D
+    // Center Bottom: Dual Cabinet IR
     cabEnBtn_.setClickingTogglesState(true);
+    cabEnBtn_.setWantsKeyboardFocus(false);
     cabEnAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "cab_en", cabEnBtn_);
     addAndMakeVisible(cabEnBtn_);
 
@@ -210,28 +256,42 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
         cabABox_.addItem("Default 8x10", 1);
         cabBBox_.addItem("Default SVT", 2);
     }
+    cabABox_.setWantsKeyboardFocus(false);
+    cabBBox_.setWantsKeyboardFocus(false);
     cabAAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, "cab_a_ir", cabABox_);
     cabBAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, "cab_b_ir", cabBBox_);
     addAndMakeVisible(cabABox_);
     addAndMakeVisible(cabBBox_);
 
-    phaseABtn_.setClickingTogglesState(true);
-    phaseBBtn_.setClickingTogglesState(true);
-    cabAutoPhaseBtn_.setClickingTogglesState(true);
-    phaseAAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "cab_a_phase", phaseABtn_);
-    phaseBAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "cab_b_phase", phaseBBtn_);
+    for (auto* b : { &phaseABtn_, &phaseBBtn_, &muteABtn_, &soloABtn_, &muteBBtn_, &soloBBtn_, &cabAutoPhaseBtn_ })
+    {
+        b->setClickingTogglesState(true);
+        b->setWantsKeyboardFocus(false);
+        addAndMakeVisible(b);
+    }
+    phaseAAtt_       = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "cab_a_phase", phaseABtn_);
+    muteAAtt_        = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "cab_a_mute", muteABtn_);
+    soloAAtt_        = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "cab_a_solo", soloABtn_);
+    phaseBAtt_       = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "cab_b_phase", phaseBBtn_);
+    muteBAtt_        = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "cab_b_mute", muteBBtn_);
+    soloBAtt_        = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "cab_b_solo", soloBBtn_);
     cabAutoPhaseAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "cab_auto_phase", cabAutoPhaseBtn_);
-    addAndMakeVisible(phaseABtn_);
-    addAndMakeVisible(phaseBBtn_);
-    addAndMakeVisible(cabAutoPhaseBtn_);
 
+    cabAPanBar_.init(*this, apvts, "cab_a_pan", "PAN", KalyxTheme::kalyxRoyalBlue, true, dark, 0.0, fmtPan,
+                     juce::String::fromUTF8("Panoramique stéréo du baffle A."));
+    cabBPanBar_.init(*this, apvts, "cab_b_pan", "PAN", KalyxTheme::kalyxAubergine, true, dark, 0.0, fmtPan,
+                     juce::String::fromUTF8("Panoramique stéréo du baffle B."));
+
+    loadIrABtn_.setWantsKeyboardFocus(false);
+    loadIrBBtn_.setWantsKeyboardFocus(false);
     loadIrABtn_.onClick = [this]() { openCustomIRChooser(0); };
     loadIrBBtn_.onClick = [this]() { openCustomIRChooser(1); };
     addAndMakeVisible(loadIrABtn_);
     addAndMakeVisible(loadIrBBtn_);
 
-    cabMixBar_.init(*this, apvts, "cab_mix", "CAB A <-> B", KalyxTheme::kalyxRoyalBlue, false, dark, 35.0,
-                    [](double v) { return juce::String(100.0 - v, 0) + "/" + juce::String(v, 0); });
+    cabMixBar_.init(*this, apvts, "cab_mix", "CAB A <-> B (EQ PWR)", KalyxTheme::kalyxRoyalBlue, false, dark, 35.0,
+                    [](double v) { return juce::String(100.0 - v, 0) + "/" + juce::String(v, 0); },
+                    juce::String::fromUTF8("Balance Equal Power (cos/sin) entre Cab A et Cab B."));
     cabBreakupBar_.init(*this, apvts, "cab_breakup", "CONE BREAKUP", KalyxTheme::classicAmber, false, dark, 18.0, fmtPct);
     cabRoomBar_.init(*this, apvts, "cab_room", "ROOM", KalyxTheme::kalyxAubergine, false, dark, 15.0, fmtPct);
 
@@ -257,6 +317,7 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
     limCeilBar_.init(*this, apvts, "lim_ceiling", "CEILING", KalyxTheme::alertRed, false, dark, -0.3, fmtDb);
 
     addChildComponent(pedalboardView_);
+    addChildComponent(tunerOverlay_);
     addChildComponent(settingsOverlay_);
 
     setResizable(true, true);
@@ -364,9 +425,11 @@ void KalyxBassRigEditor::openCustomIRChooser(int cabSlot)
 
 void KalyxBassRigEditor::timerCallback()
 {
-    tunerBar_.updateFromProcessor();
+    tunerOverlay_.updateFromProcessor();
     gateCurve_.setGateGain(proc_.getGateGain());
     ampGraph_.setThdHeatmap(proc_.getAmpThd());
+    ampGraph_.updateFFTFromProcessor();
+    ampGraph_.repaint();
     phaseCorrBar_.setCorrelation(proc_.getPhaseCorr());
     pedalboardView_.setCompGrDb(proc_.getPedalCompGrDb());
 
@@ -396,9 +459,10 @@ void KalyxBassRigEditor::applyTheme()
 {
     const bool dark = (theme_ == kalyx::bass::ChassisTheme::Day);
     lnf_.setChassisTheme(theme_);
+    sendLookAndFeelChange();
     themeBtn_.setButtonText(dark ? "NIGHT" : "DAY");
 
-    tunerBar_.setDarkText(dark);
+    tunerOverlay_.setTheme(theme_);
     gateCurve_.setDarkText(dark);
     diFilterGraph_.setDarkText(dark);
     ampGraph_.setDarkText(dark);
@@ -408,10 +472,13 @@ void KalyxBassRigEditor::applyTheme()
     settingsOverlay_.setTheme(theme_);
 
     inTrimKnob_.setThemeColours(KalyxTheme::getAccent(theme_), dark);
+    gateThreshBar_.setThemeColours(KalyxTheme::getAccent(theme_), dark);
     diSubMixBar_.setThemeColours(KalyxTheme::getPrimary(theme_), dark);
     diCompBar_.setThemeColours(KalyxTheme::getAccent(theme_), dark);
     sagBar_.setThemeColours(KalyxTheme::classicAmber, dark);
     biasBar_.setThemeColours(KalyxTheme::getPrimary(theme_), dark);
+    cabAPanBar_.setThemeColours(KalyxTheme::getAccent(theme_), dark);
+    cabBPanBar_.setThemeColours(KalyxTheme::getPrimary(theme_), dark);
     cabMixBar_.setThemeColours(KalyxTheme::getAccent(theme_), dark);
     cabBreakupBar_.setThemeColours(KalyxTheme::classicAmber, dark);
     cabRoomBar_.setThemeColours(KalyxTheme::getPrimary(theme_), dark);
@@ -421,6 +488,12 @@ void KalyxBassRigEditor::applyTheme()
     kickAmtBar_.setThemeColours(KalyxTheme::getPrimary(theme_), dark);
     limCeilBar_.setThemeColours(KalyxTheme::alertRed, dark);
     if (vuModePill_) vuModePill_->setThemeColours(KalyxTheme::getAccent(theme_), dark);
+
+    // Propagate Day Mode dark text to all Amp Head knobs & pills
+    updateAmpModelVisibility();
+    driveKnob_.setThemeColours(KalyxTheme::classicAmber, dark);
+    compBoostKnob_.setThemeColours(KalyxTheme::hybridCyan, dark);
+    presenceKnob_.setThemeColours(KalyxTheme::tangerineOrange, dark);
 
     repaint();
 }
@@ -516,7 +589,13 @@ void KalyxBassRigEditor::paint(juce::Graphics& g)
                              juce::Justification::centredLeft, 1);
         };
 
-        drawCard(leftR, "INPUT & DI PATH");
+        auto leftCopy = leftR;
+        auto inPanelR = leftCopy.removeFromTop(static_cast<int>(leftR.getHeight() * 0.36f));
+        leftCopy.removeFromTop(pad);
+        auto diPanelR = leftCopy;
+
+        drawCard(inPanelR, "INPUT STAGE");
+        drawCard(diPanelR, "DI PATH");
         drawCard(ampR, "TUBE AMP HEAD (64-BIT)");
         drawCard(cabR, "DUAL CABINET IR");
         drawCard(rightR, "MASTER & MIXER");
@@ -542,8 +621,8 @@ void KalyxBassRigEditor::resized()
     const float sc = uiScale_;
     lnf_.setUiScale(sc);
 
-    tunerBar_.setUiScale(sc);
     inTrimKnob_.setUiScale(sc);
+    gateThreshBar_.setUiScale(sc);
     gateCurve_.setUiScale(sc);
     diSubMixBar_.setUiScale(sc);
     diFilterGraph_.setUiScale(sc);
@@ -561,6 +640,8 @@ void KalyxBassRigEditor::resized()
     masterKnob_.setUiScale(sc);
     sagBar_.setUiScale(sc);
     biasBar_.setUiScale(sc);
+    cabAPanBar_.setUiScale(sc);
+    cabBPanBar_.setUiScale(sc);
     cabMixBar_.setUiScale(sc);
     cabBreakupBar_.setUiScale(sc);
     cabRoomBar_.setUiScale(sc);
@@ -573,6 +654,8 @@ void KalyxBassRigEditor::resized()
     kickAmtBar_.setUiScale(sc);
     limCeilBar_.setUiScale(sc);
     pedalboardView_.setUiScale(sc);
+    tunerOverlay_.setUiScale(sc);
+    tunerOverlay_.setBounds(getLocalBounds());
     settingsOverlay_.setUiScale(sc);
     settingsOverlay_.setBounds(getLocalBounds());
 
@@ -581,16 +664,15 @@ void KalyxBassRigEditor::resized()
     const int infoH = static_cast<int>(25.0f * sc);
     pedalboardView_.setBounds(0, hdrH, getWidth(), getHeight() - hdrH - infoH);
 
-    // Header layout
-    int hx = static_cast<int>(256.0f * sc);
-    const int tunerW = static_cast<int>(220.0f * sc);
-    tunerBar_.setBounds(hx, static_cast<int>(8.0f * sc), tunerW, static_cast<int>(30.0f * sc));
-    hx += tunerW + static_cast<int>(3.0f * sc);
-    tunerMuteBtn_.setBounds(hx, static_cast<int>(10.0f * sc), static_cast<int>(84.0f * sc), static_cast<int>(26.0f * sc));
-    hx += static_cast<int>(92.0f * sc);
-    rigTabBtn_.setBounds(hx, static_cast<int>(10.0f * sc), static_cast<int>(46.0f * sc), static_cast<int>(26.0f * sc));
-    hx += static_cast<int>(50.0f * sc);
-    pedalsTabBtn_.setBounds(hx, static_cast<int>(10.0f * sc), static_cast<int>(62.0f * sc), static_cast<int>(26.0f * sc));
+    // Header layout: [TUNER] [TUNER MUTE] [RIG] [PEDALS]
+    int hx = static_cast<int>(258.0f * sc);
+    tunerBtn_.setBounds(hx, static_cast<int>(10.0f * sc), static_cast<int>(64.0f * sc), static_cast<int>(26.0f * sc));
+    hx += static_cast<int>(68.0f * sc);
+    tunerMuteBtn_.setBounds(hx, static_cast<int>(10.0f * sc), static_cast<int>(86.0f * sc), static_cast<int>(26.0f * sc));
+    hx += static_cast<int>(96.0f * sc);
+    rigTabBtn_.setBounds(hx, static_cast<int>(10.0f * sc), static_cast<int>(50.0f * sc), static_cast<int>(26.0f * sc));
+    hx += static_cast<int>(54.0f * sc);
+    pedalsTabBtn_.setBounds(hx, static_cast<int>(10.0f * sc), static_cast<int>(66.0f * sc), static_cast<int>(26.0f * sc));
 
     int rx = getWidth() - pad;
     auto placeRight = [&](juce::Component& c, int w)
@@ -611,7 +693,10 @@ void KalyxBassRigEditor::resized()
     auto body = getLocalBounds().withTrimmedTop(hdrH + pad).withTrimmedBottom(infoH + pad).reduced(pad, 0);
     const int leftW  = static_cast<int>(260.0f * sc);
     const int rightW = static_cast<int>(255.0f * sc);
-    auto leftR  = body.removeFromLeft(leftW).reduced(static_cast<int>(10.0f * sc));
+    auto leftCol = body.removeFromLeft(leftW);
+    auto inPanelR = leftCol.removeFromTop(static_cast<int>(leftCol.getHeight() * 0.36f)).reduced(static_cast<int>(10.0f * sc));
+    leftCol.removeFromTop(pad);
+    auto diPanelR = leftCol.reduced(static_cast<int>(10.0f * sc));
     body.removeFromLeft(pad);
     auto rightR = body.removeFromRight(rightW).reduced(static_cast<int>(10.0f * sc));
     body.removeFromRight(pad);
@@ -620,13 +705,14 @@ void KalyxBassRigEditor::resized()
     auto cabR = body.reduced(static_cast<int>(10.0f * sc));
 
     const int topTitleSkip = static_cast<int>(24.0f * sc);
-    leftR.removeFromTop(topTitleSkip);
+    inPanelR.removeFromTop(topTitleSkip);
+    diPanelR.removeFromTop(topTitleSkip);
     ampR.removeFromTop(topTitleSkip);
     cabR.removeFromTop(topTitleSkip);
     rightR.removeFromTop(topTitleSkip);
 
-    // Left Column
-    auto inRow = leftR.removeFromTop(static_cast<int>(86.0f * sc));
+    // Panel 1: INPUT STAGE
+    auto inRow = inPanelR.removeFromTop(static_cast<int>(84.0f * sc));
     inTrimKnob_.setBoundsCompact(static_cast<float>(inRow.getX()), static_cast<float>(inRow.getY()),
                                  static_cast<float>(inRow.getWidth() * 0.45f), static_cast<float>(inRow.getHeight()));
     auto inBtns = inRow.withTrimmedLeft(static_cast<int>(inRow.getWidth() * 0.48f));
@@ -634,22 +720,24 @@ void KalyxBassRigEditor::resized()
     inBtns.removeFromTop(static_cast<int>(6.0f * sc));
     gateBtn_.setBounds(inBtns.removeFromTop(static_cast<int>(26.0f * sc)));
 
-    leftR.removeFromTop(static_cast<int>(6.0f * sc));
-    gateCurve_.setBounds(leftR.removeFromTop(static_cast<int>(62.0f * sc)));
-    leftR.removeFromTop(static_cast<int>(10.0f * sc));
+    inPanelR.removeFromTop(static_cast<int>(6.0f * sc));
+    gateThreshBar_.setBounds(inPanelR.removeFromTop(static_cast<int>(24.0f * sc)));
+    inPanelR.removeFromTop(static_cast<int>(6.0f * sc));
+    gateCurve_.setBounds(inPanelR);
 
-    auto diTop = leftR.removeFromTop(static_cast<int>(26.0f * sc));
+    // Panel 2: DI PATH
+    auto diTop = diPanelR.removeFromTop(static_cast<int>(26.0f * sc));
     diEnBtn_.setBounds(diTop.removeFromLeft(static_cast<int>(88.0f * sc)));
     diTop.removeFromLeft(static_cast<int>(6.0f * sc));
     diCircuitBox_.setBounds(diTop);
-    leftR.removeFromTop(static_cast<int>(6.0f * sc));
-    diSubMixBar_.setBounds(leftR.removeFromTop(static_cast<int>(24.0f * sc)));
-    leftR.removeFromTop(static_cast<int>(6.0f * sc));
-    diFilterGraph_.setBounds(leftR.removeFromTop(static_cast<int>(110.0f * sc)));
-    leftR.removeFromTop(static_cast<int>(6.0f * sc));
-    diCompBar_.setBounds(leftR.removeFromTop(static_cast<int>(24.0f * sc)));
-    leftR.removeFromTop(static_cast<int>(6.0f * sc));
-    diAutoPhaseBtn_.setBounds(leftR.removeFromTop(static_cast<int>(26.0f * sc)));
+    diPanelR.removeFromTop(static_cast<int>(8.0f * sc));
+    diSubMixBar_.setBounds(diPanelR.removeFromTop(static_cast<int>(24.0f * sc)));
+    diPanelR.removeFromTop(static_cast<int>(8.0f * sc));
+    diAutoPhaseBtn_.setBounds(diPanelR.removeFromBottom(static_cast<int>(26.0f * sc)));
+    diPanelR.removeFromBottom(static_cast<int>(6.0f * sc));
+    diCompBar_.setBounds(diPanelR.removeFromBottom(static_cast<int>(24.0f * sc)));
+    diPanelR.removeFromBottom(static_cast<int>(8.0f * sc));
+    diFilterGraph_.setBounds(diPanelR);
 
     // Amp Head
     auto ampHeaderRow = ampR.removeFromTop(static_cast<int>(28.0f * sc));
@@ -701,33 +789,38 @@ void KalyxBassRigEditor::resized()
         knobs[i]->setBoundsCompact(static_cast<float>(ampR.getX()) + static_cast<float>(i) * kw,
                                    static_cast<float>(ampR.getY()), kw, static_cast<float>(ampR.getHeight()));
 
-    // Dual Cabinet IR (Full-width clean vertical layout)
-    auto cabTop = cabR.removeFromTop(static_cast<int>(26.0f * sc));
+    // Dual Cabinet IR (Full-width with Mute, Solo, Pan, Invert, Load IR)
+    auto cabTop = cabR.removeFromTop(static_cast<int>(24.0f * sc));
     cabEnBtn_.setBounds(cabTop.removeFromLeft(static_cast<int>(94.0f * sc)));
     cabTop.removeFromLeft(static_cast<int>(8.0f * sc));
     cabAutoPhaseBtn_.setBounds(cabTop.removeFromLeft(static_cast<int>(120.0f * sc)));
 
+    auto layoutCabRow = [&](juce::ComboBox& box, juce::ToggleButton& muteB, juce::ToggleButton& soloB,
+                            juce::ToggleButton& invB, kalyx::bass::ui::TactileFaderBar& panBar, juce::TextButton& loadB)
+    {
+        cabR.removeFromTop(static_cast<int>(7.0f * sc));
+        auto row = cabR.removeFromTop(static_cast<int>(26.0f * sc));
+        const int ctrlW = static_cast<int>(370.0f * sc);
+        box.setBounds(row.removeFromLeft(std::max(140, row.getWidth() - ctrlW)));
+        row.removeFromLeft(static_cast<int>(5.0f * sc));
+        muteB.setBounds(row.removeFromLeft(static_cast<int>(52.0f * sc)));
+        row.removeFromLeft(static_cast<int>(4.0f * sc));
+        soloB.setBounds(row.removeFromLeft(static_cast<int>(52.0f * sc)));
+        row.removeFromLeft(static_cast<int>(4.0f * sc));
+        invB.setBounds(row.removeFromLeft(static_cast<int>(80.0f * sc)));
+        row.removeFromLeft(static_cast<int>(4.0f * sc));
+        panBar.setBounds(row.removeFromLeft(static_cast<int>(94.0f * sc)));
+        row.removeFromLeft(static_cast<int>(4.0f * sc));
+        loadB.setBounds(row);
+    };
+
+    layoutCabRow(cabABox_, muteABtn_, soloABtn_, phaseABtn_, cabAPanBar_, loadIrABtn_);
+    layoutCabRow(cabBBox_, muteBBtn_, soloBBtn_, phaseBBtn_, cabBPanBar_, loadIrBBtn_);
+
     cabR.removeFromTop(static_cast<int>(10.0f * sc));
-    auto cabARow = cabR.removeFromTop(static_cast<int>(28.0f * sc));
-    const int btnPairW = static_cast<int>(140.0f * sc);
-    cabABox_.setBounds(cabARow.removeFromLeft(cabARow.getWidth() - btnPairW));
-    cabARow.removeFromLeft(static_cast<int>(6.0f * sc));
-    phaseABtn_.setBounds(cabARow.removeFromLeft(static_cast<int>(48.0f * sc)));
-    cabARow.removeFromLeft(static_cast<int>(6.0f * sc));
-    loadIrABtn_.setBounds(cabARow);
-
-    cabR.removeFromTop(static_cast<int>(8.0f * sc));
-    auto cabBRow = cabR.removeFromTop(static_cast<int>(28.0f * sc));
-    cabBBox_.setBounds(cabBRow.removeFromLeft(cabBRow.getWidth() - btnPairW));
-    cabBRow.removeFromLeft(static_cast<int>(6.0f * sc));
-    phaseBBtn_.setBounds(cabBRow.removeFromLeft(static_cast<int>(48.0f * sc)));
-    cabBRow.removeFromLeft(static_cast<int>(6.0f * sc));
-    loadIrBBtn_.setBounds(cabBRow);
-
-    cabR.removeFromTop(static_cast<int>(14.0f * sc));
-    const int cabBarH = static_cast<int>(26.0f * sc);
+    const int cabBarH = static_cast<int>(24.0f * sc);
     cabMixBar_.setBounds(cabR.removeFromTop(cabBarH));
-    cabR.removeFromTop(static_cast<int>(8.0f * sc));
+    cabR.removeFromTop(static_cast<int>(6.0f * sc));
     auto cabBottomRow = cabR.removeFromTop(cabBarH);
     cabBreakupBar_.setBounds(cabBottomRow.removeFromLeft(cabBottomRow.getWidth() / 2 - static_cast<int>(4.0f * sc)));
     cabBottomRow.removeFromLeft(static_cast<int>(8.0f * sc));

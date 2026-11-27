@@ -125,7 +125,13 @@ enum class DICircuit
     p.push_back(std::make_unique<juce::AudioParameterInt>(juce::ParameterID{ "cab_a_ir", 1 }, "Cab A IR", 0, 63, 0));
     p.push_back(std::make_unique<juce::AudioParameterInt>(juce::ParameterID{ "cab_b_ir", 1 }, "Cab B IR", 0, 63, 8));
     addBool("cab_a_phase", "Cab A Phase", false);
+    addBool("cab_a_mute", "Cab A Mute", false);
+    addBool("cab_a_solo", "Cab A Solo", false);
+    addFloat("cab_a_pan", "Cab A Pan", -100.0f, 100.0f, 0.0f, 1.0f);
     addBool("cab_b_phase", "Cab B Phase", false);
+    addBool("cab_b_mute", "Cab B Mute", false);
+    addBool("cab_b_solo", "Cab B Solo", false);
+    addFloat("cab_b_pan", "Cab B Pan", -100.0f, 100.0f, 0.0f, 1.0f);
     addFloat("cab_mix", "Cab A/B Mix", 0.0f, 100.0f, 35.0f, 0.1f);
     addBool("cab_auto_phase", "Cab Auto-Phase", true);
     addFloat("cab_breakup", "Speaker Breakup", 0.0f, 100.0f, 18.0f, 0.1f);

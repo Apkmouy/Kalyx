@@ -30,7 +30,8 @@ private:
     float strobePhase_ { 0.0f };
 };
 
-class NoiseGateCurveWidget final : public juce::Component
+class NoiseGateCurveWidget final : public juce::Component,
+                                   public juce::SettableTooltipClient
 {
 public:
     void init(juce::AudioProcessorValueTreeState& apvts);
@@ -53,7 +54,8 @@ private:
     bool  darkText_ { false };
 };
 
-class DIFilterGraphWidget final : public juce::Component
+class DIFilterGraphWidget final : public juce::Component,
+                                  public juce::SettableTooltipClient
 {
 public:
     void init(juce::AudioProcessorValueTreeState& apvts);
@@ -87,6 +89,7 @@ public:
     void setDarkText(bool d) noexcept { darkText_ = d; repaint(); }
     void setAccentColour(juce::Colour c) noexcept { accent_ = c; repaint(); }
     void setThdHeatmap(float thd) noexcept { thdLevel_ = thd; repaint(); }
+    void updateFFTFromProcessor() noexcept;
 
     void paint(juce::Graphics& g) override;
     void mouseDown(const juce::MouseEvent& e) override;
@@ -105,6 +108,32 @@ private:
     float uiScale_  { 1.0f };
     bool  darkText_ { false };
     int   dragEqIdx_ { -1 };
+
+    juce::dsp::FFT forwardFFT_ { 11 };
+    juce::dsp::WindowingFunction<float> window_ { 2048, juce::dsp::WindowingFunction<float>::hann };
+    std::array<float, 4096> fftData_ {};
+    std::array<float, 1024> smoothedBinsDb_ {};
+};
+
+class TunerOverlay final : public juce::Component
+{
+public:
+    explicit TunerOverlay(KalyxBassRigProcessor& proc);
+    void setUiScale(float s) noexcept;
+    void setTheme(kalyx::bass::ChassisTheme t) noexcept;
+    void updateFromProcessor();
+    void paint(juce::Graphics& g) override;
+    void resized() override;
+    void mouseDown(const juce::MouseEvent& e) override;
+
+private:
+    KalyxBassRigProcessor& proc_;
+    kalyx::bass::ChassisTheme theme_ { kalyx::bass::ChassisTheme::Night };
+    float uiScale_ { 1.0f };
+    StrobeTunerBar tunerBar_;
+    juce::TextButton muteBtn_ { "TUNER MUTE" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> muteAtt_;
+    juce::TextButton closeBtn_ { "X" };
 };
 
 class PhaseCorrelometerBar final : public juce::Component

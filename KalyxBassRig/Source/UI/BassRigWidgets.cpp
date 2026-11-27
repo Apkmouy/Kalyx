@@ -305,6 +305,25 @@ void DIFilterGraphWidget::mouseUp(const juce::MouseEvent&)
 AmpToneEQGraphWidget::AmpToneEQGraphWidget(KalyxBassRigProcessor& proc)
     : proc_(proc)
 {
+    smoothedBinsDb_.fill(-100.0f);
+}
+
+void AmpToneEQGraphWidget::updateFFTFromProcessor() noexcept
+{
+    std::array<float, 2048> raw {};
+    proc_.copyPostAmpFFT(raw.data());
+    fftData_.fill(0.0f);
+    for (size_t i = 0; i < 2048; ++i)
+        fftData_[i] = raw[i];
+    window_.multiplyWithWindowingTable(fftData_.data(), 2048);
+    forwardFFT_.performFrequencyOnlyForwardTransform(fftData_.data());
+
+    for (size_t b = 1; b < 1024; ++b)
+    {
+        const float mag = fftData_[b] / 512.0f;
+        const float db  = (mag > 1.0e-5f) ? (20.0f * std::log10(mag)) : -100.0f;
+        smoothedBinsDb_[b] = 0.72f * smoothedBinsDb_[b] + 0.28f * std::clamp(db, -100.0f, 6.0f);
+    }
 }
 
 float AmpToneEQGraphWidget::freqToX(float hz, const juce::Rectangle<float>& area) const noexcept
@@ -329,7 +348,7 @@ void AmpToneEQGraphWidget::paint(juce::Graphics& g)
 {
     const float sc = uiScale_;
     const auto r = getLocalBounds().toFloat().reduced(1.0f * sc);
-    const auto bg = darkText_ ? KalyxTheme::dayControlIdleBg : KalyxTheme::nightControlIdleBg;
+    const auto bg = darkText_ ? KalyxTheme::dayControlIdleBg : KalyxTheme::nightChassisBg;
     const auto bd = darkText_ ? KalyxTheme::dayGridBorder : KalyxTheme::nightGridBorder;
     const auto tx = darkText_ ? KalyxTheme::dayTextPrimary : KalyxTheme::nightTextPrimary;
 
@@ -348,19 +367,67 @@ void AmpToneEQGraphWidget::paint(juce::Graphics& g)
     g.setColour(bd);
     g.drawRoundedRectangle(r, 5.0f * sc, 1.2f * sc);
 
-    const auto plot = r.reduced(8.0f * sc);
-    // Grid lines: 0 dB & key freqs
-    g.setColour(tx.withAlpha(0.15f));
-    const float y0 = gainToY(0.0f, plot);
-    g.drawLine(plot.getX(), y0, plot.getRight(), y0, 1.0f * sc);
-    for (float f : { 40.0f, 100.0f, 250.0f, 500.0f, 1000.0f, 4000.0f, 10000.0f })
+    const auto plot = r.reduced(10.0f * sc, 8.0f * sc);
+    const double fs = proc_.getCurrentSampleRate();
+
+    // Watermark Grid: Horizontal dB lines (+12, +6, 0, -6, -12)
+    g.setFont(KalyxTheme::makeMonoFont(8.5f * sc, juce::Font::plain));
+    for (float db : { -12.0f, -6.0f, 0.0f, 6.0f, 12.0f })
     {
-        const float x = freqToX(f, plot);
-        g.drawLine(x, plot.getY(), x, plot.getBottom(), 0.8f * sc);
+        const float y = gainToY(db, plot);
+        const bool isZero = (std::abs(db) < 0.1f);
+        g.setColour(tx.withAlpha(isZero ? 0.25f : 0.10f));
+        g.drawLine(plot.getX(), y, plot.getRight(), y, isZero ? 1.1f * sc : 0.7f * sc);
+        g.setColour(tx.withAlpha(0.35f));
+        g.drawFittedText((db > 0 ? "+" : "") + juce::String(static_cast<int>(db)),
+                         juce::Rectangle<int>(static_cast<int>(plot.getX() + 2.0f), static_cast<int>(y - 10.0f * sc),
+                                              static_cast<int>(24.0f * sc), static_cast<int>(10.0f * sc)),
+                         juce::Justification::centredLeft, 1);
+    }
+
+    // Watermark Grid: Vertical Hz lines
+    const struct { float f; const char* lbl; } kGridFreqs[] = {
+        { 40.0f, "40" }, { 100.0f, "100" }, { 250.0f, "250" }, { 500.0f, "500" },
+        { 1000.0f, "1k" }, { 4000.0f, "4k" }, { 10000.0f, "10k" }
+    };
+    for (const auto& gf : kGridFreqs)
+    {
+        const float x = freqToX(gf.f, plot);
+        g.setColour(tx.withAlpha(0.10f));
+        g.drawLine(x, plot.getY(), x, plot.getBottom(), 0.7f * sc);
+        g.setColour(tx.withAlpha(0.35f));
+        g.drawFittedText(gf.lbl,
+                         juce::Rectangle<int>(static_cast<int>(x - 14.0f * sc), static_cast<int>(plot.getBottom() - 11.0f * sc),
+                                              static_cast<int>(28.0f * sc), static_cast<int>(11.0f * sc)),
+                         juce::Justification::centred, 1);
+    }
+
+    // Post-Amp FFT Spectrum in low-opacity background
+    {
+        juce::Path fftPath;
+        bool started = false;
+        const float binHz = static_cast<float>(fs) / 2048.0f;
+        for (int i = 0; i <= 96; ++i)
+        {
+            const float t = static_cast<float>(i) / 96.0f;
+            const float f = 20.0f * std::pow(16000.0f / 20.0f, t);
+            const int bin = std::clamp(static_cast<int>(std::round(f / std::max(1.0f, binHz))), 1, 1023);
+            const float db = smoothedBinsDb_[static_cast<size_t>(bin)];
+            const float normY = std::clamp((db + 84.0f) / 84.0f, 0.0f, 1.0f);
+            const float px = freqToX(f, plot);
+            const float py = plot.getBottom() - normY * plot.getHeight();
+            if (!started) { fftPath.startNewSubPath(plot.getX(), plot.getBottom()); fftPath.lineTo(px, py); started = true; }
+            else          { fftPath.lineTo(px, py); }
+        }
+        fftPath.lineTo(plot.getRight(), plot.getBottom());
+        fftPath.closeSubPath();
+        g.setColour(accent_.withAlpha(0.16f));
+        g.fillPath(fftPath);
+        g.setColour(accent_.withAlpha(0.32f));
+        g.strokePath(fftPath, juce::PathStrokeType(1.0f * sc));
     }
 
     const auto st = proc_.getAmpSnapshot();
-    const double fs = proc_.getCurrentSampleRate();
 
     juce::Path curve;
     const int nPts = 96;
@@ -553,6 +620,94 @@ void SettingsOverlay::resized()
 void SettingsOverlay::mouseDown(const juce::MouseEvent& e)
 {
     const auto card = getLocalBounds().toFloat().withSizeKeepingCentre(420.0f * uiScale_, 240.0f * uiScale_);
+    if (!card.contains(e.position))
+        setVisible(false);
+}
+
+// ==============================================================================
+// TunerOverlay
+// ==============================================================================
+TunerOverlay::TunerOverlay(KalyxBassRigProcessor& proc)
+    : proc_(proc), tunerBar_(proc)
+{
+    addAndMakeVisible(tunerBar_);
+    muteBtn_.setClickingTogglesState(true);
+    muteBtn_.setWantsKeyboardFocus(false);
+    muteAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(proc_.getAPVTS(), "tuner_mute", muteBtn_);
+    addAndMakeVisible(muteBtn_);
+
+    closeBtn_.setWantsKeyboardFocus(false);
+    closeBtn_.onClick = [this]() { setVisible(false); };
+    addAndMakeVisible(closeBtn_);
+}
+
+void TunerOverlay::setUiScale(float s) noexcept
+{
+    uiScale_ = std::clamp(s, 0.75f, 2.20f);
+    tunerBar_.setUiScale(uiScale_ * 1.25f);
+    resized();
+    repaint();
+}
+
+void TunerOverlay::setTheme(kalyx::bass::ChassisTheme t) noexcept
+{
+    theme_ = t;
+    tunerBar_.setDarkText(t == kalyx::bass::ChassisTheme::Day);
+    repaint();
+}
+
+void TunerOverlay::updateFromProcessor()
+{
+    if (isVisible())
+    {
+        tunerBar_.updateFromProcessor();
+        repaint();
+    }
+}
+
+void TunerOverlay::paint(juce::Graphics& g)
+{
+    const float sc = uiScale_;
+    g.setColour(juce::Colours::black.withAlpha(0.62f));
+    g.fillAll();
+
+    const auto card = getLocalBounds().toFloat().withSizeKeepingCentre(520.0f * sc, 185.0f * sc);
+    g.setColour(KalyxTheme::getStripBg(theme_));
+    g.fillRoundedRectangle(card, 8.0f * sc);
+    g.setColour(KalyxTheme::getAccent(theme_));
+    g.drawRoundedRectangle(card, 8.0f * sc, 1.8f * sc);
+
+    g.setColour(KalyxTheme::getTextPrimary(theme_));
+    g.setFont(KalyxTheme::makeFont(14.0f * sc, juce::Font::bold));
+    g.drawFittedText("CHROMATIC PRECISION TUNER",
+                     card.reduced(16.0f * sc).withHeight(24.0f * sc).toNearestInt(),
+                     juce::Justification::centredLeft, 1);
+
+    const float hz = proc_.getTunerFreq();
+    const float conf = proc_.getTunerConf();
+    const juce::String hzStr = (conf > 0.25f && hz > 10.0f) ? (juce::String(hz, 1) + " Hz") : "--- Hz";
+    g.setColour(KalyxTheme::getTextSecondary(theme_));
+    g.setFont(KalyxTheme::makeMonoFont(11.5f * sc, juce::Font::plain));
+    g.drawFittedText("PITCH: " + hzStr,
+                     card.reduced(16.0f * sc).withTrimmedTop(118.0f * sc).withHeight(24.0f * sc).toNearestInt(),
+                     juce::Justification::centredLeft, 1);
+}
+
+void TunerOverlay::resized()
+{
+    const float sc = uiScale_;
+    const auto card = getLocalBounds().withSizeKeepingCentre(static_cast<int>(520.0f * sc), static_cast<int>(185.0f * sc));
+    closeBtn_.setBounds(card.getRight() - static_cast<int>(36.0f * sc), card.getY() + static_cast<int>(10.0f * sc),
+                        static_cast<int>(26.0f * sc), static_cast<int>(26.0f * sc));
+    tunerBar_.setBounds(card.getX() + static_cast<int>(16.0f * sc), card.getY() + static_cast<int>(48.0f * sc),
+                        card.getWidth() - static_cast<int>(32.0f * sc), static_cast<int>(64.0f * sc));
+    muteBtn_.setBounds(card.getRight() - static_cast<int>(126.0f * sc), card.getBottom() - static_cast<int>(42.0f * sc),
+                       static_cast<int>(110.0f * sc), static_cast<int>(28.0f * sc));
+}
+
+void TunerOverlay::mouseDown(const juce::MouseEvent& e)
+{
+    const auto card = getLocalBounds().toFloat().withSizeKeepingCentre(520.0f * uiScale_, 185.0f * uiScale_);
     if (!card.contains(e.position))
         setVisible(false);
 }

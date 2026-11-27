@@ -1,5 +1,30 @@
 #include "KalyxTheme.h"
 
+void KalyxBassLookAndFeel::setChassisTheme(kalyx::bass::ChassisTheme t) noexcept
+{
+    theme_ = t;
+    const auto bg   = KalyxTheme::getControlIdleBg(t);
+    const auto strip = KalyxTheme::getStripBg(t);
+    const auto bd   = KalyxTheme::getGridBorder(t);
+    const auto txt  = KalyxTheme::getTextPrimary(t);
+    const auto acc  = KalyxTheme::getAccent(t);
+
+    setColour(juce::ComboBox::backgroundColourId, bg);
+    setColour(juce::ComboBox::textColourId, txt);
+    setColour(juce::ComboBox::outlineColourId, bd);
+    setColour(juce::ComboBox::arrowColourId, txt.withAlpha(0.75f));
+
+    setColour(juce::PopupMenu::backgroundColourId, strip);
+    setColour(juce::PopupMenu::textColourId, txt);
+    setColour(juce::PopupMenu::highlightedBackgroundColourId, acc);
+    setColour(juce::PopupMenu::highlightedTextColourId, KalyxTheme::nightTextPrimary);
+
+    setColour(juce::TextButton::buttonColourId, bg);
+    setColour(juce::TextButton::buttonOnColourId, acc);
+    setColour(juce::TextButton::textColourOffId, txt);
+    setColour(juce::TextButton::textColourOnId, KalyxTheme::nightTextPrimary);
+}
+
 void KalyxBassLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
                                             float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
                                             juce::Slider& slider)

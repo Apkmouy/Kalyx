@@ -134,8 +134,9 @@ void DualCabEngine::loadBufferIntoConvolution(int cabSlot, juce::AudioBuffer<flo
     }
 
     const double rms = std::sqrt(sumSq / static_cast<double>(n));
-    const float normGain = (rms > 1.0e-7) ? static_cast<float>(0.08 / rms) : 1.0f;
-    irBuffer.applyGain(std::clamp(normGain, 0.05f, 20.0f));
+    // Calibrated unity-loudness IR normalization (-12 dB internal compensation vs raw bypass)
+    const float normGain = (rms > 1.0e-7) ? static_cast<float>(0.020 / rms) : 1.0f;
+    irBuffer.applyGain(std::clamp(normGain, 0.01f, 8.0f));
 
     // Scale peakIdx to current host sampleRate
     const int scaledPeak = static_cast<int>(std::round(static_cast<double>(peakIdx) * (sampleRate_ / std::max(sourceSampleRate, 8000.0))));
@@ -214,19 +215,34 @@ void DualCabEngine::processBlock(const float* monoIn, float* outL, float* outR, 
         bufB[i] = static_cast<float>(s);
     }
 
-    // 2. Zero-latency stereo/mono convolution for Cab A & Cab B (direct IR playback)
+    const bool anySolo = state_.soloA || state_.soloB;
+    const bool runA = !state_.muteA && (!anySolo || state_.soloA);
+    const bool runB = !state_.muteB && (!anySolo || state_.soloB);
+
+    // 2. Zero-latency convolution for Cab A & Cab B (CPU bypass when muted/unsoloed)
+    if (runA)
     {
         juce::dsp::AudioBlock<float> blkA(workBufA_.getArrayOfWritePointers(), 1, static_cast<size_t>(numSamples));
         juce::dsp::ProcessContextReplacing<float> ctxA(blkA);
         convA_.process(ctxA);
     }
+    else
+    {
+        workBufA_.clear();
+    }
+
+    if (runB)
     {
         juce::dsp::AudioBlock<float> blkB(workBufB_.getArrayOfWritePointers(), 1, static_cast<size_t>(numSamples));
         juce::dsp::ProcessContextReplacing<float> ctxB(blkB);
         convB_.process(ctxB);
     }
+    else
+    {
+        workBufB_.clear();
+    }
 
-    // 3. Auto-Phase Align A vs B + Phase Invert + Mix + Room
+    // 3. Auto-Phase Align A vs B + Phase Invert + Equal Power (cos/sin) Mix + Pan + Room
     const int peakA = cabAPeakSample_.load(std::memory_order_relaxed);
     const int peakB = cabBPeakSample_.load(std::memory_order_relaxed);
     const int delayA = (state_.autoPhase && peakB > peakA) ? std::min(peakB - peakA, kMaxDelaySamples - 1) : 0;
@@ -234,8 +250,33 @@ void DualCabEngine::processBlock(const float* monoIn, float* outL, float* outR, 
 
     const float polA = state_.phaseA ? -1.0f : 1.0f;
     const float polB = state_.phaseB ? -1.0f : 1.0f;
-    const float mixB = static_cast<float>(std::clamp(state_.mixPct / 100.0, 0.0, 1.0));
-    const float mixA = 1.0f - mixB;
+
+    float gainA = 0.0f;
+    float gainB = 0.0f;
+    if (runA && runB)
+    {
+        // Equal Power (Constant Power) Crossfade: cos / sin
+        const float theta = static_cast<float>(std::clamp(state_.mixPct / 100.0, 0.0, 1.0) * 1.5707963267948966);
+        gainA = std::cos(theta);
+        gainB = std::sin(theta);
+    }
+    else if (runA)
+    {
+        gainA = 1.0f;
+    }
+    else if (runB)
+    {
+        gainB = 1.0f;
+    }
+
+    // Equal-power stereo pan for Cab A & Cab B
+    const float panAngleA = static_cast<float>((std::clamp(state_.panAPct / 100.0, -1.0, 1.0) + 1.0) * 0.7853981633974483);
+    const float panAngleB = static_cast<float>((std::clamp(state_.panBPct / 100.0, -1.0, 1.0) + 1.0) * 0.7853981633974483);
+    const float panAL = std::cos(panAngleA) * 1.41421356f;
+    const float panAR = std::sin(panAngleA) * 1.41421356f;
+    const float panBL = std::cos(panAngleB) * 1.41421356f;
+    const float panBR = std::sin(panAngleB) * 1.41421356f;
+
     const float roomAmt = static_cast<float>(std::clamp(state_.roomPct / 100.0, 0.0, 1.0)) * 0.35f;
 
     const int tapL1 = static_cast<int>(0.011 * sampleRate_);
@@ -252,15 +293,17 @@ void DualCabEngine::processBlock(const float* monoIn, float* outL, float* outR, 
         int rB = alignWriteIdx_ - delayB; if (rB < 0) rB += kMaxDelaySamples;
         alignWriteIdx_ = (alignWriteIdx_ + 1) % kMaxDelaySamples;
 
-        double m = static_cast<double>(alignDelayA_[static_cast<size_t>(rA)] * mixA
-                                     + alignDelayB_[static_cast<size_t>(rB)] * mixB);
+        const float sA = alignDelayA_[static_cast<size_t>(rA)] * gainA;
+        const float sB = alignDelayB_[static_cast<size_t>(rB)] * gainB;
+        float dryL = sA * panAL + sB * panBL;
+        float dryR = sA * panAR + sB * panBR;
 
-        if (std::abs(m) < 1.0e-7)
-            m = 0.0;
+        if (std::abs(dryL) < 1.0e-7f) dryL = 0.0f;
+        if (std::abs(dryR) < 1.0e-7f) dryR = 0.0f;
 
-        const float dry = static_cast<float>(m);
-        roomBufL_[static_cast<size_t>(roomWriteIdx_)] = dry;
-        roomBufR_[static_cast<size_t>(roomWriteIdx_)] = dry;
+        const float dryMono = 0.5f * (dryL + dryR);
+        roomBufL_[static_cast<size_t>(roomWriteIdx_)] = dryMono;
+        roomBufR_[static_cast<size_t>(roomWriteIdx_)] = dryMono;
 
         auto readRoom = [&](const std::array<float, kRoomBufSize>& b, int tap) noexcept -> float
         {
@@ -276,8 +319,8 @@ void DualCabEngine::processBlock(const float* monoIn, float* outL, float* outR, 
         const float wetL = static_cast<float>(roomLPF_L_.processSample(static_cast<double>(reflL)));
         const float wetR = static_cast<float>(roomLPF_R_.processSample(static_cast<double>(reflR)));
 
-        outL[i] = dry + wetL * roomAmt;
-        outR[i] = dry + wetR * roomAmt;
+        outL[i] = dryL + wetL * roomAmt;
+        outR[i] = dryR + wetR * roomAmt;
     }
 }
 

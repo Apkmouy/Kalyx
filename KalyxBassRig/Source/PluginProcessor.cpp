@@ -170,7 +170,13 @@ void KalyxBassRigProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     cabSt.cabAIndex  = irA;
     cabSt.cabBIndex  = irB;
     cabSt.phaseA     = getF("cab_a_phase") > 0.5f;
+    cabSt.muteA      = getF("cab_a_mute") > 0.5f;
+    cabSt.soloA      = getF("cab_a_solo") > 0.5f;
+    cabSt.panAPct    = getF("cab_a_pan");
     cabSt.phaseB     = getF("cab_b_phase") > 0.5f;
+    cabSt.muteB      = getF("cab_b_mute") > 0.5f;
+    cabSt.soloB      = getF("cab_b_solo") > 0.5f;
+    cabSt.panBPct    = getF("cab_b_pan");
     cabSt.mixPct     = getF("cab_mix");
     cabSt.autoPhase  = getF("cab_auto_phase") > 0.5f;
     cabSt.breakupPct = getF("cab_breakup");
@@ -296,15 +302,21 @@ void KalyxBassRigProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
 
     pedalboard_.processPre(preMonoBuf_.data(), numSamples);
 
+    int fw = fftWriteIdx_.load(std::memory_order_relaxed);
     for (int i = 0; i < numSamples; ++i)
     {
         const double preS = preMonoBuf_[static_cast<size_t>(i)];
         const double ampS = ampEn ? ampEngine_.processSample(preS) : preS;
         const double diS  = diEngine_.processSample(preS);
 
-        ampMonoBuf_[static_cast<size_t>(i)] = static_cast<float>(ampS);
+        const float ampF = static_cast<float>(ampS);
+        ampMonoBuf_[static_cast<size_t>(i)] = ampF;
         diMonoBuf_[static_cast<size_t>(i)]  = static_cast<float>(diS);
+
+        fftRing_[static_cast<size_t>(fw)] = ampF;
+        fw = (fw + 1) % kFFTSize;
     }
+    fftWriteIdx_.store(fw, std::memory_order_relaxed);
 
     // 4. Dual Cabinet IR + 2D Mic + Room
     dualCab_.processBlock(ampMonoBuf_.data(), cabOutL_.data(), cabOutR_.data(), numSamples);
@@ -368,6 +380,13 @@ void KalyxBassRigProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
 
     const double denom = std::sqrt(std::max(corrDenA_ * corrDenB_, 1.0e-18));
     phaseCorr_.store(static_cast<float>(std::clamp(corrNum_ / denom, -1.0, 1.0)), std::memory_order_relaxed);
+}
+
+void KalyxBassRigProcessor::copyPostAmpFFT(float* dest2048) noexcept
+{
+    const int w = fftWriteIdx_.load(std::memory_order_relaxed);
+    for (int i = 0; i < kFFTSize; ++i)
+        dest2048[i] = fftRing_[static_cast<size_t>((w + i) % kFFTSize)];
 }
 
 juce::AudioProcessorEditor* KalyxBassRigProcessor::createEditor()
