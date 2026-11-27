@@ -85,17 +85,16 @@ private:
     kalyx::bass::ui::KalyxRotaryControl gainKnob_, bassKnob_, midKnob_, trebleKnob_, driveKnob_, compBoostKnob_, presenceKnob_, masterKnob_;
     kalyx::bass::ui::TactileFaderBar sagBar_, biasBar_;
 
-    // Center Bottom: Dual Cabinet & Mic 2D
+    // Center Bottom: Dual Cabinet IR
     juce::ToggleButton cabEnBtn_ { "CABINET" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> cabEnAtt_;
-    juce::ComboBox cabABox_, cabBBox_, micTypeBox_;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> cabAAtt_, cabBAtt_, micTypeAtt_;
+    juce::ComboBox cabABox_, cabBBox_;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> cabAAtt_, cabBAtt_;
     juce::ToggleButton phaseABtn_ { "O A" }, phaseBBtn_ { "O B" }, cabAutoPhaseBtn_ { "AUTO PHASE" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> phaseAAtt_, phaseBAtt_, cabAutoPhaseAtt_;
     juce::TextButton loadIrABtn_ { "LOAD IR A" }, loadIrBBtn_ { "LOAD IR B" };
     std::unique_ptr<juce::FileChooser> fileChooser_;
 
-    kalyx::bass::ui::TopographicMicPad2D micPad2D_;
     kalyx::bass::ui::TactileFaderBar cabMixBar_, cabBreakupBar_, cabRoomBar_;
 
     // Right Column: Master & Mixer

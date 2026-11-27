@@ -92,16 +92,19 @@ void KalyxRotaryControl::setDimmed(bool dimmed)
 
 void KalyxRotaryControl::setBoundsCompact(float x, float y, float w, float h)
 {
-    const int titleH = static_cast<int>(14.0f * uiScale);
-    const int valH   = static_cast<int>(14.0f * uiScale);
-    const int knobH  = std::max(24, static_cast<int>(h) - titleH - valH);
+    const int titleH = static_cast<int>(15.0f * uiScale);
+    const int valH   = static_cast<int>(15.0f * uiScale);
+    const int availH = std::max(24, static_cast<int>(h) - titleH - valH - static_cast<int>(4.0f * uiScale));
+    const int maxKnob = static_cast<int>(std::min({ w * 0.72f, 62.0f * uiScale, static_cast<float>(availH) }));
     const int xi = static_cast<int>(x);
     const int yi = static_cast<int>(y);
     const int wi = static_cast<int>(w);
+    const int knobX = xi + (wi - maxKnob) / 2;
+    const int knobY = yi + titleH + (availH - maxKnob) / 2;
 
     titleLabel.setBounds(xi, yi, wi, titleH);
-    slider.setBounds(xi, yi + titleH, wi, knobH);
-    valueLabel.setBounds(xi, yi + titleH + knobH, wi, valH);
+    slider.setBounds(knobX, knobY, maxKnob, maxKnob);
+    valueLabel.setBounds(xi, yi + titleH + availH + static_cast<int>(2.0f * uiScale), wi, valH);
 }
 
 // ==============================================================================

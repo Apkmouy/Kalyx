@@ -141,41 +141,53 @@ void NoiseGateCurveWidget::paint(juce::Graphics& g)
 {
     const float sc = uiScale_;
     const auto r = getLocalBounds().toFloat().reduced(1.0f * sc);
-    const auto bg = darkText_ ? KalyxTheme::dayControlIdleBg : KalyxTheme::nightControlIdleBg;
+    const auto bg = darkText_ ? KalyxTheme::dayControlIdleBg : KalyxTheme::nightChassisBg;
     const auto bd = darkText_ ? KalyxTheme::dayGridBorder : KalyxTheme::nightGridBorder;
     const auto tx = darkText_ ? KalyxTheme::dayTextPrimary : KalyxTheme::nightTextPrimary;
 
     g.setColour(bg);
-    g.fillRoundedRectangle(r, 4.0f * sc);
+    g.fillRoundedRectangle(r, 5.0f * sc);
     g.setColour(bd);
-    g.drawRoundedRectangle(r, 4.0f * sc, 1.0f * sc);
+    g.drawRoundedRectangle(r, 5.0f * sc, 1.0f * sc);
 
-    const float alpha = enabled_ ? 1.0f : 0.35f;
-    const auto plot = r.reduced(6.0f * sc);
+    const float alpha = enabled_ ? 1.0f : 0.38f;
+    const auto plot = r.reduced(8.0f * sc, 6.0f * sc);
+    const auto headerArea = plot.withHeight(14.0f * sc);
+    const auto graphArea  = plot.withTrimmedTop(16.0f * sc);
+
     const float txNorm = std::clamp((threshDb_ + 80.0f) / 70.0f, 0.0f, 1.0f);
-    const float txX = plot.getX() + txNorm * plot.getWidth();
-    const float txY = plot.getBottom() - txNorm * plot.getHeight();
+    const float txX = graphArea.getX() + txNorm * graphArea.getWidth();
+    const float txY = graphArea.getBottom() - txNorm * graphArea.getHeight();
+
+    // Recessed gate attenuation region
+    g.setColour(KalyxTheme::kalyxAubergine.withAlpha(0.22f * alpha));
+    g.fillRect(graphArea.getX(), graphArea.getY(), std::max(0.0f, txX - graphArea.getX()), graphArea.getHeight());
 
     juce::Path p;
-    p.startNewSubPath(plot.getX(), plot.getBottom());
-    p.lineTo(txX, plot.getBottom());
+    p.startNewSubPath(graphArea.getX(), graphArea.getBottom());
+    p.lineTo(txX, graphArea.getBottom());
     p.lineTo(txX, txY);
-    p.lineTo(plot.getRight(), plot.getY());
+    p.lineTo(graphArea.getRight(), graphArea.getY());
 
     g.setColour(KalyxTheme::kalyxRoyalBlueGlow.withAlpha(alpha));
     g.strokePath(p, juce::PathStrokeType(2.0f * sc));
 
-    g.setColour(tx.withAlpha(0.78f));
-    g.setFont(KalyxTheme::makeMonoFont(9.5f * sc, juce::Font::plain));
-    g.drawFittedText("GATE " + juce::String(threshDb_, 0) + " dB",
-                     plot.toNearestInt(), juce::Justification::topLeft, 1);
+    // Threshold vertical handle + node
+    g.setColour(KalyxTheme::classicAmber.withAlpha(0.75f * alpha));
+    g.drawLine(txX, graphArea.getY(), txX, graphArea.getBottom(), 1.2f * sc);
+    g.fillEllipse(txX - 3.5f * sc, txY - 3.5f * sc, 7.0f * sc, 7.0f * sc);
+
+    g.setColour(tx.withAlpha(0.80f));
+    g.setFont(KalyxTheme::makeMonoFont(9.5f * sc, juce::Font::bold));
+    g.drawFittedText("GATE THRESH", headerArea.toNearestInt(), juce::Justification::centredLeft, 1);
+    g.drawFittedText(juce::String(threshDb_, 0) + " dB", headerArea.toNearestInt(), juce::Justification::centredRight, 1);
 }
 
 void NoiseGateCurveWidget::mouseDown(const juce::MouseEvent& e) { mouseDrag(e); }
 void NoiseGateCurveWidget::mouseDrag(const juce::MouseEvent& e)
 {
     if (threshAtt_ == nullptr) return;
-    const auto plot = getLocalBounds().toFloat().reduced(6.0f * uiScale_);
+    const auto plot = getLocalBounds().toFloat().reduced(8.0f * uiScale_, 6.0f * uiScale_);
     const float norm = std::clamp((static_cast<float>(e.x) - plot.getX()) / std::max(10.0f, plot.getWidth()), 0.0f, 1.0f);
     threshAtt_->setValueAsCompleteGesture(-80.0f + norm * 70.0f);
 }
@@ -209,14 +221,14 @@ void DIFilterGraphWidget::init(juce::AudioProcessorValueTreeState& apvts)
 
 float DIFilterGraphWidget::freqToX(float hz) const noexcept
 {
-    const auto plot = getLocalBounds().toFloat().reduced(6.0f * uiScale_);
+    const auto plot = getLocalBounds().toFloat().reduced(8.0f * uiScale_, 6.0f * uiScale_);
     const float t = std::log(std::clamp(hz, 20.0f, 5000.0f) / 20.0f) / std::log(5000.0f / 20.0f);
     return plot.getX() + t * plot.getWidth();
 }
 
 float DIFilterGraphWidget::xToFreq(float x) const noexcept
 {
-    const auto plot = getLocalBounds().toFloat().reduced(6.0f * uiScale_);
+    const auto plot = getLocalBounds().toFloat().reduced(8.0f * uiScale_, 6.0f * uiScale_);
     const float t = std::clamp((x - plot.getX()) / std::max(10.0f, plot.getWidth()), 0.0f, 1.0f);
     return 20.0f * std::pow(5000.0f / 20.0f, t);
 }
@@ -225,24 +237,26 @@ void DIFilterGraphWidget::paint(juce::Graphics& g)
 {
     const float sc = uiScale_;
     const auto r = getLocalBounds().toFloat().reduced(1.0f * sc);
-    const auto bg = darkText_ ? KalyxTheme::dayControlIdleBg : KalyxTheme::nightControlIdleBg;
+    const auto bg = darkText_ ? KalyxTheme::dayControlIdleBg : KalyxTheme::nightChassisBg;
     const auto bd = darkText_ ? KalyxTheme::dayGridBorder : KalyxTheme::nightGridBorder;
     const auto tx = darkText_ ? KalyxTheme::dayTextPrimary : KalyxTheme::nightTextPrimary;
 
     g.setColour(bg);
-    g.fillRoundedRectangle(r, 4.0f * sc);
+    g.fillRoundedRectangle(r, 5.0f * sc);
     g.setColour(bd);
-    g.drawRoundedRectangle(r, 4.0f * sc, 1.0f * sc);
+    g.drawRoundedRectangle(r, 5.0f * sc, 1.0f * sc);
 
-    const auto plot = r.reduced(6.0f * sc);
+    const auto plot = r.reduced(8.0f * sc, 6.0f * sc);
+    const auto graphArea = plot.withTrimmedBottom(15.0f * sc);
+    const auto labelArea = plot.withTop(graphArea.getBottom() + 2.0f * sc);
     const float hx = freqToX(hpfHz_);
     const float lx = freqToX(lpfHz_);
 
     juce::Path band;
-    band.startNewSubPath(plot.getX(), plot.getBottom());
-    band.lineTo(hx, plot.getY() + 6.0f * sc);
-    band.lineTo(std::max(hx + 2.0f, lx), plot.getY() + 6.0f * sc);
-    band.lineTo(plot.getRight(), plot.getBottom());
+    band.startNewSubPath(graphArea.getX(), graphArea.getBottom());
+    band.lineTo(hx, graphArea.getY() + 6.0f * sc);
+    band.lineTo(std::max(hx + 2.0f, lx), graphArea.getY() + 6.0f * sc);
+    band.lineTo(graphArea.getRight(), graphArea.getBottom());
 
     g.setColour(KalyxTheme::kalyxAubergine.withAlpha(0.32f));
     g.fillPath(band);
@@ -251,13 +265,13 @@ void DIFilterGraphWidget::paint(juce::Graphics& g)
 
     // Handles
     g.setColour(KalyxTheme::classicAmber);
-    g.fillEllipse(hx - 4.0f * sc, plot.getY() + 2.0f * sc, 8.0f * sc, 8.0f * sc);
-    g.fillEllipse(lx - 4.0f * sc, plot.getY() + 2.0f * sc, 8.0f * sc, 8.0f * sc);
+    g.fillEllipse(hx - 4.0f * sc, graphArea.getY() + 2.0f * sc, 8.0f * sc, 8.0f * sc);
+    g.fillEllipse(lx - 4.0f * sc, graphArea.getY() + 2.0f * sc, 8.0f * sc, 8.0f * sc);
 
-    g.setColour(tx.withAlpha(0.75f));
+    g.setColour(tx.withAlpha(0.80f));
     g.setFont(KalyxTheme::makeMonoFont(9.5f * sc, juce::Font::plain));
-    g.drawFittedText("HP " + juce::String(hpfHz_, 0) + "Hz  LP " + juce::String(lpfHz_, 0) + "Hz",
-                     plot.toNearestInt(), juce::Justification::bottomLeft, 1);
+    g.drawFittedText("HPF " + juce::String(hpfHz_, 0) + " Hz", labelArea.toNearestInt(), juce::Justification::centredLeft, 1);
+    g.drawFittedText("LPF " + juce::String(lpfHz_, 0) + " Hz", labelArea.toNearestInt(), juce::Justification::centredRight, 1);
 }
 
 void DIFilterGraphWidget::mouseDown(const juce::MouseEvent& e)
@@ -426,79 +440,6 @@ void AmpToneEQGraphWidget::mouseDoubleClick(const juce::MouseEvent&)
     for (auto* id : kEqIds)
         if (auto* p = proc_.getAPVTS().getParameter(id))
             p->setValueNotifyingHost(p->convertTo0to1(0.0f));
-}
-
-// ==============================================================================
-// TopographicMicPad2D
-// ==============================================================================
-void TopographicMicPad2D::init(juce::AudioProcessorValueTreeState& apvts)
-{
-    paramX_ = apvts.getParameter("mic_pos_x");
-    paramY_ = apvts.getParameter("mic_pos_y");
-    if (paramX_ != nullptr)
-    {
-        attX_ = std::make_unique<juce::ParameterAttachment>(*paramX_, [this](float v) { posX_ = v; repaint(); });
-        attX_->sendInitialUpdate();
-    }
-    if (paramY_ != nullptr)
-    {
-        attY_ = std::make_unique<juce::ParameterAttachment>(*paramY_, [this](float v) { posY_ = v; repaint(); });
-        attY_->sendInitialUpdate();
-    }
-}
-
-void TopographicMicPad2D::paint(juce::Graphics& g)
-{
-    const float sc = uiScale_;
-    const auto r = getLocalBounds().toFloat().reduced(1.0f * sc);
-    const auto bg = darkText_ ? KalyxTheme::dayControlIdleBg : KalyxTheme::nightControlIdleBg;
-    const auto bd = darkText_ ? KalyxTheme::dayGridBorder : KalyxTheme::nightGridBorder;
-    const auto tx = darkText_ ? KalyxTheme::dayTextPrimary : KalyxTheme::nightTextPrimary;
-
-    g.setColour(bg);
-    g.fillRoundedRectangle(r, 5.0f * sc);
-    g.setColour(bd);
-    g.drawRoundedRectangle(r, 5.0f * sc, 1.2f * sc);
-
-    // Topographic concentric speaker cone rings
-    const float cx = r.getCentreX();
-    const float cy = r.getCentreY();
-    const float maxR = std::min(r.getWidth(), r.getHeight()) * 0.43f;
-    for (int i = 1; i <= 4; ++i)
-    {
-        const float rad = maxR * (static_cast<float>(i) / 4.0f);
-        g.setColour(tx.withAlpha(i == 1 ? 0.25f : 0.14f));
-        g.drawEllipse(cx - rad, cy - rad, rad * 2.0f, rad * 2.0f, 1.0f * sc);
-    }
-
-    // Mic dot
-    const auto pad = r.reduced(10.0f * sc);
-    const float mx = pad.getX() + (posX_ / 100.0f) * pad.getWidth();
-    const float my = pad.getBottom() - (posY_ / 100.0f) * pad.getHeight();
-    g.setColour(KalyxTheme::kalyxRoyalBlueGlow);
-    g.fillEllipse(mx - 6.0f * sc, my - 6.0f * sc, 12.0f * sc, 12.0f * sc);
-    g.setColour(KalyxTheme::nightTextPrimary);
-    g.drawEllipse(mx - 6.0f * sc, my - 6.0f * sc, 12.0f * sc, 12.0f * sc, 1.4f * sc);
-
-    g.setColour(tx.withAlpha(0.72f));
-    g.setFont(KalyxTheme::makeMonoFont(9.0f * sc, juce::Font::plain));
-    g.drawFittedText("CAP<->EDGE " + juce::String(static_cast<int>(posX_)) + "%  PROX " + juce::String(static_cast<int>(posY_)) + "%",
-                     r.reduced(4.0f * sc).toNearestInt(), juce::Justification::centredBottom, 1);
-}
-
-void TopographicMicPad2D::mouseDown(const juce::MouseEvent& e) { mouseDrag(e); }
-void TopographicMicPad2D::mouseDrag(const juce::MouseEvent& e)
-{
-    const auto pad = getLocalBounds().toFloat().reduced(10.0f * uiScale_);
-    const float nx = std::clamp((static_cast<float>(e.x) - pad.getX()) / std::max(10.0f, pad.getWidth()), 0.0f, 1.0f) * 100.0f;
-    const float ny = std::clamp((pad.getBottom() - static_cast<float>(e.y)) / std::max(10.0f, pad.getHeight()), 0.0f, 1.0f) * 100.0f;
-    if (attX_) attX_->setValueAsCompleteGesture(nx);
-    if (attY_) attY_->setValueAsCompleteGesture(ny);
-}
-void TopographicMicPad2D::mouseDoubleClick(const juce::MouseEvent&)
-{
-    if (attX_) attX_->setValueAsCompleteGesture(25.0f);
-    if (attY_) attY_->setValueAsCompleteGesture(75.0f);
 }
 
 // ==============================================================================

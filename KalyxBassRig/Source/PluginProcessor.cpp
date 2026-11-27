@@ -174,9 +174,6 @@ void KalyxBassRigProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     cabSt.mixPct     = getF("cab_mix");
     cabSt.autoPhase  = getF("cab_auto_phase") > 0.5f;
     cabSt.breakupPct = getF("cab_breakup");
-    cabSt.micType    = static_cast<kalyx::bass::MicType>(std::clamp(static_cast<int>(getF("mic_type")), 0, 5));
-    cabSt.micPosXPct = getF("mic_pos_x");
-    cabSt.micPosYPct = getF("mic_pos_y");
     cabSt.roomPct    = getF("cab_room");
     dualCab_.setControlState(cabSt);
 

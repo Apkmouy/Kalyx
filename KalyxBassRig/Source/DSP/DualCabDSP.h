@@ -29,9 +29,6 @@ struct CabControlState
     double  mixPct       { 35.0 }; // 0=100% A, 100=100% B
     bool    autoPhase    { true };
     double  breakupPct   { 18.0 }; // Speaker Excursion / Breakup
-    MicType micType      { MicType::RE20 };
-    double  micPosXPct   { 25.0 }; // 0=Cap, 100=Edge
-    double  micPosYPct   { 75.0 }; // 0=Far, 100=Close Proximity
     double  roomPct      { 15.0 }; // 0..100
 };
 
@@ -92,12 +89,6 @@ private:
     // Speaker excursion / breakup (64-bit)
     ADAASaturator coneBreakup_;
     ZDFStateVariableFilter coneResonance_;
-
-    // 2D Mic Placement & Voicing filters (64-bit)
-    ZDFStateVariableFilter micProximityShelf_;
-    ZDFStateVariableFilter micCapEdgeLPF_;
-    ZDFStateVariableFilter micVoicingBell_;
-    ZDFStateVariableFilter micVoicingAir_;
 
     // Zero-allocation stereo Room early-reflections
     static constexpr int kRoomBufSize = 8192;

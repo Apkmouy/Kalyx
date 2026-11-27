@@ -230,19 +230,12 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
     addAndMakeVisible(loadIrABtn_);
     addAndMakeVisible(loadIrBBtn_);
 
-    micTypeBox_.addItemList({ "RE20", "D112", "MD421", "U47 FET", "SM57", "Ribbon 121" }, 1);
-    micTypeAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvts, "mic_type", micTypeBox_);
-    addAndMakeVisible(micTypeBox_);
-
-    micPad2D_.init(apvts);
-    addAndMakeVisible(micPad2D_);
-
     cabMixBar_.init(*this, apvts, "cab_mix", "CAB A <-> B", KalyxTheme::kalyxRoyalBlue, false, dark, 35.0,
                     [](double v) { return juce::String(100.0 - v, 0) + "/" + juce::String(v, 0); });
     cabBreakupBar_.init(*this, apvts, "cab_breakup", "CONE BREAKUP", KalyxTheme::classicAmber, false, dark, 18.0, fmtPct);
     cabRoomBar_.init(*this, apvts, "cab_room", "ROOM", KalyxTheme::kalyxAubergine, false, dark, 15.0, fmtPct);
 
-    // Right Column: Master & Mixer
+    // Right Column: Master & Mixer (Official Kalyx Palette)
     addAndMakeVisible(vuMeter_);
     vuModePill_ = std::make_unique<kalyx::bass::ui::KalyxSegmentedPill>(
         apvts, "vu_mode", "", juce::StringArray { "IN", "OUT", "GR" }, KalyxTheme::kalyxRoyalBlue, dark);
@@ -251,7 +244,7 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
 
     ampLevelFader_.init(*this, apvts, "amp_level", "AMP", KalyxTheme::kalyxRoyalBlue, dark, -60.0, 12.0, 0.0);
     diLevelFader_.init(*this, apvts, "di_level", "DI", KalyxTheme::kalyxAubergine, dark, -60.0, 12.0, -6.0);
-    outFader_.init(*this, apvts, "out_fader", "OUT", KalyxTheme::jadeGreen, dark, -60.0, 12.0, 0.0);
+    outFader_.init(*this, apvts, "out_fader", "OUT", KalyxTheme::classicAmber, dark, -60.0, 12.0, 0.0);
 
     kickEnBtn_.setClickingTogglesState(true);
     limEnBtn_.setClickingTogglesState(true);
@@ -409,7 +402,6 @@ void KalyxBassRigEditor::applyTheme()
     gateCurve_.setDarkText(dark);
     diFilterGraph_.setDarkText(dark);
     ampGraph_.setDarkText(dark);
-    micPad2D_.setDarkText(dark);
     phaseCorrBar_.setDarkText(dark);
     vuMeter_.setDarkText(dark);
     pedalboardView_.setDarkText(dark);
@@ -425,7 +417,7 @@ void KalyxBassRigEditor::applyTheme()
     cabRoomBar_.setThemeColours(KalyxTheme::getPrimary(theme_), dark);
     ampLevelFader_.setThemeColours(KalyxTheme::getAccent(theme_), dark);
     diLevelFader_.setThemeColours(KalyxTheme::getPrimary(theme_), dark);
-    outFader_.setThemeColours(KalyxTheme::jadeGreen, dark);
+    outFader_.setThemeColours(KalyxTheme::classicAmber, dark);
     kickAmtBar_.setThemeColours(KalyxTheme::getPrimary(theme_), dark);
     limCeilBar_.setThemeColours(KalyxTheme::alertRed, dark);
     if (vuModePill_) vuModePill_->setThemeColours(KalyxTheme::getAccent(theme_), dark);
@@ -526,7 +518,7 @@ void KalyxBassRigEditor::paint(juce::Graphics& g)
 
         drawCard(leftR, "INPUT & DI PATH");
         drawCard(ampR, "TUBE AMP HEAD (64-BIT)");
-        drawCard(cabR, "DUAL CABINET IR & MIC 2D");
+        drawCard(cabR, "DUAL CABINET IR");
         drawCard(rightR, "MASTER & MIXER");
     }
 
@@ -569,7 +561,6 @@ void KalyxBassRigEditor::resized()
     masterKnob_.setUiScale(sc);
     sagBar_.setUiScale(sc);
     biasBar_.setUiScale(sc);
-    micPad2D_.setUiScale(sc);
     cabMixBar_.setUiScale(sc);
     cabBreakupBar_.setUiScale(sc);
     cabRoomBar_.setUiScale(sc);
@@ -710,41 +701,37 @@ void KalyxBassRigEditor::resized()
         knobs[i]->setBoundsCompact(static_cast<float>(ampR.getX()) + static_cast<float>(i) * kw,
                                    static_cast<float>(ampR.getY()), kw, static_cast<float>(ampR.getHeight()));
 
-    // Dual Cabinet & Mic 2D
-    auto cabLeft = cabR.removeFromLeft(static_cast<int>(cabR.getWidth() * 0.62f));
-    cabR.removeFromLeft(static_cast<int>(10.0f * sc));
+    // Dual Cabinet IR (Full-width clean vertical layout)
+    auto cabTop = cabR.removeFromTop(static_cast<int>(26.0f * sc));
+    cabEnBtn_.setBounds(cabTop.removeFromLeft(static_cast<int>(94.0f * sc)));
+    cabTop.removeFromLeft(static_cast<int>(8.0f * sc));
+    cabAutoPhaseBtn_.setBounds(cabTop.removeFromLeft(static_cast<int>(120.0f * sc)));
 
-    auto cabTop = cabLeft.removeFromTop(static_cast<int>(26.0f * sc));
-    cabEnBtn_.setBounds(cabTop.removeFromLeft(static_cast<int>(90.0f * sc)));
-    cabTop.removeFromLeft(static_cast<int>(6.0f * sc));
-    cabAutoPhaseBtn_.setBounds(cabTop.removeFromLeft(static_cast<int>(110.0f * sc)));
-
-    cabLeft.removeFromTop(static_cast<int>(6.0f * sc));
-    auto cabARow = cabLeft.removeFromTop(static_cast<int>(26.0f * sc));
-    cabABox_.setBounds(cabARow.removeFromLeft(cabARow.getWidth() - static_cast<int>(126.0f * sc)));
-    cabARow.removeFromLeft(static_cast<int>(4.0f * sc));
-    phaseABtn_.setBounds(cabARow.removeFromLeft(static_cast<int>(46.0f * sc)));
-    cabARow.removeFromLeft(static_cast<int>(4.0f * sc));
+    cabR.removeFromTop(static_cast<int>(10.0f * sc));
+    auto cabARow = cabR.removeFromTop(static_cast<int>(28.0f * sc));
+    const int btnPairW = static_cast<int>(140.0f * sc);
+    cabABox_.setBounds(cabARow.removeFromLeft(cabARow.getWidth() - btnPairW));
+    cabARow.removeFromLeft(static_cast<int>(6.0f * sc));
+    phaseABtn_.setBounds(cabARow.removeFromLeft(static_cast<int>(48.0f * sc)));
+    cabARow.removeFromLeft(static_cast<int>(6.0f * sc));
     loadIrABtn_.setBounds(cabARow);
 
-    cabLeft.removeFromTop(static_cast<int>(6.0f * sc));
-    auto cabBRow = cabLeft.removeFromTop(static_cast<int>(26.0f * sc));
-    cabBBox_.setBounds(cabBRow.removeFromLeft(cabBRow.getWidth() - static_cast<int>(126.0f * sc)));
-    cabBRow.removeFromLeft(static_cast<int>(4.0f * sc));
-    phaseBBtn_.setBounds(cabBRow.removeFromLeft(static_cast<int>(46.0f * sc)));
-    cabBRow.removeFromLeft(static_cast<int>(4.0f * sc));
+    cabR.removeFromTop(static_cast<int>(8.0f * sc));
+    auto cabBRow = cabR.removeFromTop(static_cast<int>(28.0f * sc));
+    cabBBox_.setBounds(cabBRow.removeFromLeft(cabBRow.getWidth() - btnPairW));
+    cabBRow.removeFromLeft(static_cast<int>(6.0f * sc));
+    phaseBBtn_.setBounds(cabBRow.removeFromLeft(static_cast<int>(48.0f * sc)));
+    cabBRow.removeFromLeft(static_cast<int>(6.0f * sc));
     loadIrBBtn_.setBounds(cabBRow);
 
-    cabLeft.removeFromTop(static_cast<int>(8.0f * sc));
-    cabMixBar_.setBounds(cabLeft.removeFromTop(static_cast<int>(24.0f * sc)));
-    cabLeft.removeFromTop(static_cast<int>(6.0f * sc));
-    cabBreakupBar_.setBounds(cabLeft.removeFromTop(static_cast<int>(24.0f * sc)));
-    cabLeft.removeFromTop(static_cast<int>(6.0f * sc));
-    cabRoomBar_.setBounds(cabLeft.removeFromTop(static_cast<int>(24.0f * sc)));
-
-    micTypeBox_.setBounds(cabR.removeFromTop(static_cast<int>(26.0f * sc)));
-    cabR.removeFromTop(static_cast<int>(6.0f * sc));
-    micPad2D_.setBounds(cabR);
+    cabR.removeFromTop(static_cast<int>(14.0f * sc));
+    const int cabBarH = static_cast<int>(26.0f * sc);
+    cabMixBar_.setBounds(cabR.removeFromTop(cabBarH));
+    cabR.removeFromTop(static_cast<int>(8.0f * sc));
+    auto cabBottomRow = cabR.removeFromTop(cabBarH);
+    cabBreakupBar_.setBounds(cabBottomRow.removeFromLeft(cabBottomRow.getWidth() / 2 - static_cast<int>(4.0f * sc)));
+    cabBottomRow.removeFromLeft(static_cast<int>(8.0f * sc));
+    cabRoomBar_.setBounds(cabBottomRow);
 
     // Right Column: Master & Mixer
     vuMeter_.setBounds(rightR.removeFromTop(static_cast<int>(82.0f * sc)));

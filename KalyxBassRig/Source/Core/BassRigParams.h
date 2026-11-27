@@ -30,16 +30,6 @@ enum class DICircuit
     SubHarmonic  = 4
 };
 
-enum class MicType
-{
-    RE20      = 0,
-    D112      = 1,
-    MD421     = 2,
-    U47FET    = 3,
-    SM57      = 4,
-    Ribbon121 = 5
-};
-
 [[nodiscard]] inline float mapLog(float norm01, float minV, float maxV) noexcept
 {
     const float t = std::clamp(norm01, 0.0f, 1.0f);
@@ -139,9 +129,6 @@ enum class MicType
     addFloat("cab_mix", "Cab A/B Mix", 0.0f, 100.0f, 35.0f, 0.1f);
     addBool("cab_auto_phase", "Cab Auto-Phase", true);
     addFloat("cab_breakup", "Speaker Breakup", 0.0f, 100.0f, 18.0f, 0.1f);
-    addChoice("mic_type", "Mic Type", { "RE20", "D112", "MD421", "U47 FET", "SM57", "Ribbon 121" }, 0);
-    addFloat("mic_pos_x", "Mic Cap-Edge", 0.0f, 100.0f, 25.0f, 0.1f);
-    addFloat("mic_pos_y", "Mic Proximity", 0.0f, 100.0f, 75.0f, 0.1f);
     addFloat("cab_room", "Room Ambience", 0.0f, 100.0f, 15.0f, 0.1f);
 
     // Master, Kick-Relief Sidechain, Limiter & UI

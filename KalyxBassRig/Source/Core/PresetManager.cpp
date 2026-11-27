@@ -121,8 +121,6 @@ void PresetManager::applyFactoryPreset(int idx)
         setParam("amp_bass", 6.5f);
         setParam("amp_mid", 1.5f);
         setParam("amp_treble", -8.0f);
-        setParam("mic_type", 5.0f); // Ribbon 121
-        setParam("mic_pos_y", 25.0f); // Far
         setParam("fx_comp_en", 1.0f);
         setParam("fx_comp_mode", 0.0f); // OPTO
         setParam("fx_comp_amt", 55.0f);

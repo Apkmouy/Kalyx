@@ -107,28 +107,6 @@ private:
     int   dragEqIdx_ { -1 };
 };
 
-class TopographicMicPad2D final : public juce::Component
-{
-public:
-    void init(juce::AudioProcessorValueTreeState& apvts);
-    void setUiScale(float s) noexcept { uiScale_ = std::clamp(s, 0.75f, 2.20f); repaint(); }
-    void setDarkText(bool d) noexcept { darkText_ = d; repaint(); }
-
-    void paint(juce::Graphics& g) override;
-    void mouseDown(const juce::MouseEvent& e) override;
-    void mouseDrag(const juce::MouseEvent& e) override;
-    void mouseDoubleClick(const juce::MouseEvent& e) override;
-
-private:
-    juce::RangedAudioParameter* paramX_ { nullptr };
-    juce::RangedAudioParameter* paramY_ { nullptr };
-    std::unique_ptr<juce::ParameterAttachment> attX_, attY_;
-    float posX_ { 25.0f }; // 0..100
-    float posY_ { 75.0f }; // 0..100
-    float uiScale_  { 1.0f };
-    bool  darkText_ { false };
-};
-
 class PhaseCorrelometerBar final : public juce::Component
 {
 public:

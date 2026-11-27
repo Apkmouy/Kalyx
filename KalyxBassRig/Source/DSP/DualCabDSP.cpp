@@ -57,10 +57,6 @@ void DualCabEngine::reset() noexcept
     convB_.reset();
     coneBreakup_.reset(0.0);
     coneResonance_.reset();
-    micProximityShelf_.reset();
-    micCapEdgeLPF_.reset();
-    micVoicingBell_.reset();
-    micVoicingAir_.reset();
     roomLPF_L_.reset();
     roomLPF_R_.reset();
     alignDelayA_.fill(0.0f);
@@ -177,46 +173,7 @@ void DualCabEngine::setControlState(const CabControlState& state) noexcept
 
 void DualCabEngine::updateMicAndRoomFilters() noexcept
 {
-    // Cap (0%) -> bright 9.5 kHz, Edge (100%) -> dark 2.4 kHz
-    const double capEdgeNorm = std::clamp(state_.micPosXPct / 100.0, 0.0, 1.0);
-    const double lpfHz = 9500.0 * std::pow(2400.0 / 9500.0, capEdgeNorm);
-    micCapEdgeLPF_.setLowPass(sampleRate_, lpfHz, 0.707);
-
-    // Proximity (0% = Far 0dB, 100% = Close +6.5 dB @ 95 Hz)
-    const double proxNorm = std::clamp(state_.micPosYPct / 100.0, 0.0, 1.0);
-    micProximityShelf_.setLowShelf(sampleRate_, 95.0, 0.65, proxNorm * 6.5);
-
     coneResonance_.setBell(sampleRate_, 105.0, 1.4, (state_.breakupPct / 100.0) * 2.5);
-
-    // 6 Mic Voicings
-    switch (state_.micType)
-    {
-        case MicType::RE20:
-            micVoicingBell_.setBell(sampleRate_, 120.0, 0.8, 1.5);
-            micVoicingAir_.setHighShelf(sampleRate_, 4500.0, 0.707, 1.0);
-            break;
-        case MicType::D112:
-            micVoicingBell_.setBell(sampleRate_, 3200.0, 1.1, 3.5);
-            micVoicingAir_.setLowShelf(sampleRate_, 75.0, 0.75, 2.5);
-            break;
-        case MicType::MD421:
-            micVoicingBell_.setBell(sampleRate_, 2200.0, 1.0, 2.8);
-            micVoicingAir_.setHighShelf(sampleRate_, 5500.0, 0.707, -1.5);
-            break;
-        case MicType::U47FET:
-            micVoicingBell_.setBell(sampleRate_, 160.0, 0.7, 2.2);
-            micVoicingAir_.setHighShelf(sampleRate_, 6000.0, 0.707, 2.0);
-            break;
-        case MicType::SM57:
-            micVoicingBell_.setBell(sampleRate_, 2600.0, 1.2, 4.0);
-            micVoicingAir_.setLowShelf(sampleRate_, 110.0, 0.7, -2.5);
-            break;
-        case MicType::Ribbon121:
-            micVoicingBell_.setBell(sampleRate_, 180.0, 0.75, 2.0);
-            micVoicingAir_.setHighShelf(sampleRate_, 3200.0, 0.65, -4.5);
-            break;
-    }
-
     roomLPF_L_.setLowPass(sampleRate_, 3800.0, 0.707);
     roomLPF_R_.setLowPass(sampleRate_, 3500.0, 0.707);
 }
@@ -257,7 +214,7 @@ void DualCabEngine::processBlock(const float* monoIn, float* outL, float* outR, 
         bufB[i] = static_cast<float>(s);
     }
 
-    // 2. Zero-latency stereo/mono convolution for Cab A & Cab B
+    // 2. Zero-latency stereo/mono convolution for Cab A & Cab B (direct IR playback)
     {
         juce::dsp::AudioBlock<float> blkA(workBufA_.getArrayOfWritePointers(), 1, static_cast<size_t>(numSamples));
         juce::dsp::ProcessContextReplacing<float> ctxA(blkA);
@@ -269,7 +226,7 @@ void DualCabEngine::processBlock(const float* monoIn, float* outL, float* outR, 
         convB_.process(ctxB);
     }
 
-    // 3. Auto-Phase Align A vs B + Phase Invert + Mix + 2D Mic + Room
+    // 3. Auto-Phase Align A vs B + Phase Invert + Mix + Room
     const int peakA = cabAPeakSample_.load(std::memory_order_relaxed);
     const int peakB = cabBPeakSample_.load(std::memory_order_relaxed);
     const int delayA = (state_.autoPhase && peakB > peakA) ? std::min(peakB - peakA, kMaxDelaySamples - 1) : 0;
@@ -299,16 +256,7 @@ void DualCabEngine::processBlock(const float* monoIn, float* outL, float* outR, 
                                      + alignDelayB_[static_cast<size_t>(rB)] * mixB);
 
         if (std::abs(m) < 1.0e-7)
-        {
             m = 0.0;
-        }
-        else
-        {
-            m = micProximityShelf_.processSample(m);
-            m = micCapEdgeLPF_.processSample(m);
-            m = micVoicingBell_.processSample(m);
-            m = micVoicingAir_.processSample(m);
-        }
 
         const float dry = static_cast<float>(m);
         roomBufL_[static_cast<size_t>(roomWriteIdx_)] = dry;
