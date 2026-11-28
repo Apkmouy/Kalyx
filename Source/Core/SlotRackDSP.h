@@ -105,7 +105,7 @@ private:
     void  proc4BandEq(float& l, float& r, const SlotParamArray& p, bool isApi550B, float tolFreqL, float tolFreqR) noexcept;
     void  procNeve1073Eq(float& l, float& r, const SlotParamArray& p, float tolFreqL, float tolFreqR) noexcept;
     void  procConsoleColor(float& l, float& r, const SlotParamArray& p, float tolBiasL, float tolBiasR) noexcept;
-    float procPrecisionLimiter(float& l, float& r, const SlotParamArray& p) noexcept;
+    float procPrecisionLimiter(float& l, float& r, float detL, float detR, const SlotParamArray& p) noexcept;
 
     double sampleRate_    { 44100.0 };
     int activeModuleId_   { static_cast<int>(SlotModuleId::EmptyBypass) };

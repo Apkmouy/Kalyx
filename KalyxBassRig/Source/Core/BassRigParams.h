@@ -107,6 +107,7 @@ enum class DICircuit
     addFloat("amp_sag", "Power Sag", 0.0f, 100.0f, 30.0f, 0.1f);
     addFloat("amp_bias", "Tube Bias", -50.0f, 50.0f, 0.0f, 0.5f);
     addFloat("amp_master", "Amp Master", 0.0f, 100.0f, 65.0f, 0.1f);
+    addFloat("amp_head_out", "Head Out", -24.0f, 24.0f, 0.0f, 0.1f);
 
     // 9-Band Graphic EQ (Hybrid 4-PRO 07S728-02)
     addBool("eq9_en", "9-Band EQ Enable", true);
@@ -141,7 +142,10 @@ enum class DICircuit
     // Master, Kick-Relief Sidechain, Limiter & UI
     addFloat("amp_level", "Amp+Cab Level", -60.0f, 12.0f, 0.0f, 0.1f, 2.0f);
     addBool("kick_relief_en", "Kick-Relief SC", false);
-    addFloat("kick_relief_amt", "Kick-Relief Amount", 0.0f, 100.0f, 45.0f, 0.1f);
+    addFloat("kick_sc_in", "Kick SC Input Trim", -24.0f, 24.0f, 0.0f, 0.1f);
+    addFloat("kick_sc_hpf", "Kick SC HPF", 20.0f, 300.0f, 45.0f, 1.0f, 0.5f);
+    addFloat("kick_relief_amt", "Kick Duck Depth", -24.0f, 0.0f, -9.0f, 0.1f);
+    addBool("kick_sc_listen", "Kick SC Listen", false);
     addBool("lim_en", "Brickwall Limiter", true);
     addFloat("lim_ceiling", "Limiter Ceiling", -24.0f, 0.0f, -0.3f, 0.1f);
     addFloat("out_fader", "Out Fader", -60.0f, 12.0f, 0.0f, 0.1f, 2.0f);

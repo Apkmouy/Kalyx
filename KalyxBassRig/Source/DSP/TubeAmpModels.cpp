@@ -321,7 +321,12 @@ double TubeAmpEngine::processSample(double x) noexcept
     sig = nfbRolloff_.processSample(sig);
     sig = dcBlocker_.processHP(sig);
 
-    const double out = sig * masterGain;
+    const double masterNorm   = std::clamp(state_.masterPct / 100.0, 0.0, 1.0);
+    const double driveFactor  = (state_.model == AmpModel::Hybrid4Pro) ? 0.35 : 0.65;
+    const double autoGainComp = 0.75 / (1.0 + (masterNorm * driveFactor));
+    const double headOutGain  = std::pow(10.0, std::clamp(state_.headOutDb, -24.0, 24.0) / 20.0);
+
+    const double out = sig * autoGainComp * headOutGain;
 
     // Telemetry for UI Heatmap ("Aura Réactive") & Sag meter
     const double delta = std::min(1.0, std::abs(out - prePower) * 2.5 + gainNorm * 0.25 + driveNorm * 0.25);

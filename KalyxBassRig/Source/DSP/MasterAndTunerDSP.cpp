@@ -208,28 +208,50 @@ void SmartKickRelief64::prepare(double sampleRate) noexcept
 
 void SmartKickRelief64::reset() noexcept
 {
-    scEnv_ = 0.0;
+    scEnv_     = 0.0;
+    lastHpfHz_ = -1.0;
+    scHpf_.reset();
     dynBellL_.reset();
     dynBellR_.reset();
     duckDb_.store(0.0f, std::memory_order_relaxed);
 }
 
-void SmartKickRelief64::processStereo(double& l, double& r, double sidechainSample, bool enabled, double amountPct) noexcept
+void SmartKickRelief64::processStereo(double& l, double& r, double sidechainSample,
+                                      bool enabled, double scInDb, double scHpfHz,
+                                      double duckDepthDb, bool scListen) noexcept
 {
-    if (!enabled || amountPct <= 0.5)
+    const double clampedHpf = std::clamp(scHpfHz, 20.0, 300.0);
+    if (std::abs(clampedHpf - lastHpfHz_) > 0.1)
+    {
+        scHpf_.setHighPass(sampleRate_, clampedHpf, 0.707);
+        lastHpfHz_ = clampedHpf;
+    }
+
+    const double scInGain   = std::pow(10.0, std::clamp(scInDb, -24.0, 24.0) / 20.0);
+    const double filteredSc = scHpf_.processSample(sidechainSample * scInGain);
+
+    if (scListen)
+    {
+        l = filteredSc;
+        r = filteredSc;
+        duckDb_.store(0.0f, std::memory_order_relaxed);
+        return;
+    }
+
+    if (!enabled || duckDepthDb >= -0.05)
     {
         duckDb_.store(0.0f, std::memory_order_relaxed);
         return;
     }
 
-    const double absSc = std::abs(sidechainSample);
+    const double absSc = std::abs(filteredSc);
     const double att   = std::exp(-1.0 / (0.002 * sampleRate_));
     const double rel   = std::exp(-1.0 / (0.090 * sampleRate_));
     scEnv_ = (absSc > scEnv_) ? (att * scEnv_ + (1.0 - att) * absSc)
                               : (rel * scEnv_ + (1.0 - rel) * absSc);
 
-    const double amt = std::clamp(amountPct / 100.0, 0.0, 1.0);
-    const double duckDb = -std::min(12.0, scEnv_ * 24.0 * amt);
+    const double maxDuck = std::abs(std::clamp(duckDepthDb, -24.0, 0.0));
+    const double duckDb  = -std::min(maxDuck, scEnv_ * maxDuck * 2.5);
     duckDb_.store(static_cast<float>(duckDb), std::memory_order_relaxed);
 
     if (duckDb < -0.05)

@@ -87,6 +87,13 @@ ModuleSlotView::ModuleSlotView(KalyxHybridConsoleProcessor& proc, int slotIndex)
                      "AG", KalyxTheme::getAccent(theme_), theme_ == kalyx::core::ChassisTheme::Day,
                      "Per-Slot Auto-Gain (+/-18 dB max, freezes below -60 dBFS, returns to 0 dB after 2s silence)");
 
+    setupKalyxToggle(*this, extScBtn_, extScAtt_, processor_.getAPVTS(), ParamIDs::inExtSc,
+                     "EXT SC", KalyxTheme::kalyxRoyalBlueGlow, theme_ == kalyx::core::ChassisTheme::Day,
+                     "Use External Sidechain Bus (Inputs 3-4) for Dynamics detection");
+    setupKalyxToggle(*this, scListenBtn_, scListenAtt_, processor_.getAPVTS(), ParamIDs::inScListen,
+                     "SC LISTEN", KalyxTheme::kalyxAubergine, theme_ == kalyx::core::ChassisTheme::Day,
+                     "Audition External Sidechain Bus (Inputs 3-4) on Main Output");
+
     syncModuleFromAPVTS();
 }
 
@@ -130,6 +137,8 @@ void ModuleSlotView::setUiScale(float s)
 {
     uiScale_ = std::clamp(s, 0.75f, 2.20f);
     agBtn_.getProperties().set("kalyxScale", uiScale_);
+    extScBtn_.getProperties().set("kalyxScale", uiScale_);
+    scListenBtn_.getProperties().set("kalyxScale", uiScale_);
     for (auto& r : rotaries_)       r->setUiScale(uiScale_);
     for (auto& sp : segmentedPills_) sp->setUiScale(uiScale_);
     for (auto& rs : rotarySteps_)   rs->setUiScale(uiScale_);
@@ -161,6 +170,8 @@ void ModuleSlotView::setChassisTheme(kalyx::core::ChassisTheme t)
     agBtn_.setColour(juce::ToggleButton::tickColourId, KalyxTheme::getAccent(theme_));
     agBtn_.setColour(juce::ToggleButton::textColourId, KalyxTheme::getTextPrimary(theme_));
     agBtn_.getProperties().set("kalyxDarkText", darkTxt);
+    extScBtn_.getProperties().set("kalyxDarkText", darkTxt);
+    scListenBtn_.getProperties().set("kalyxDarkText", darkTxt);
 
     for (auto& r : rotaries_)
         r->setThemeColours(r->arcColour, capCol, darkTxt);
@@ -1266,27 +1277,43 @@ void ModuleSlotView::resized()
     ledMeterRect_ = {};
     peakLedRect_  = {};
 
+    const bool isDynWithExtSc = (mod == Mod::SSL4000Comp || mod == Mod::API2500Comp || mod == Mod::Neve5254Comp
+                              || mod == Mod::PrecisionLimiter || mod == Mod::UA1176Comp || mod == Mod::LA2AComp
+                              || mod == Mod::DistressorComp || mod == Mod::FairchildComp);
+    extScBtn_.setVisible(isDynWithExtSc);
+    scListenBtn_.setVisible(isDynWithExtSc);
+    int contentTop = static_cast<int>(headerH);
+    if (isDynWithExtSc)
+    {
+        const float hw  = (innerW - 4.0f * uiScale_) * 0.5f;
+        const float scH = 19.0f * uiScale_;
+        extScBtn_.setBounds(static_cast<int>(pad), static_cast<int>(y), static_cast<int>(hw), static_cast<int>(scH));
+        scListenBtn_.setBounds(static_cast<int>(pad + hw + 4.0f * uiScale_), static_cast<int>(y), static_cast<int>(hw), static_cast<int>(scH));
+        y += scH + 3.0f * uiScale_;
+        contentTop = static_cast<int>(y);
+    }
+
     if (mod == Mod::UA1176Comp && ua1176UI_)
     {
-        ua1176UI_->setBounds(0, static_cast<int>(headerH), getWidth(), std::max(0, getHeight() - static_cast<int>(headerH)));
+        ua1176UI_->setBounds(0, contentTop, getWidth(), std::max(0, getHeight() - contentTop));
         return;
     }
 
     if (mod == Mod::LA2AComp && la2aUI_)
     {
-        la2aUI_->setBounds(0, static_cast<int>(headerH), getWidth(), std::max(0, getHeight() - static_cast<int>(headerH)));
+        la2aUI_->setBounds(0, contentTop, getWidth(), std::max(0, getHeight() - contentTop));
         return;
     }
 
     if (mod == Mod::DistressorComp && distressorUI_)
     {
-        distressorUI_->setBounds(0, static_cast<int>(headerH), getWidth(), std::max(0, getHeight() - static_cast<int>(headerH)));
+        distressorUI_->setBounds(0, contentTop, getWidth(), std::max(0, getHeight() - contentTop));
         return;
     }
 
     if (mod == Mod::FairchildComp && fairchildUI_)
     {
-        fairchildUI_->setBounds(0, static_cast<int>(headerH), getWidth(), std::max(0, getHeight() - static_cast<int>(headerH)));
+        fairchildUI_->setBounds(0, contentTop, getWidth(), std::max(0, getHeight() - contentTop));
         return;
     }
 

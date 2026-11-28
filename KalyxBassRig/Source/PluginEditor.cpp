@@ -241,7 +241,9 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
     presenceKnob_.init(*this, apvts, "amp_presence", "PRESENCE", KalyxTheme::tangerineOrange, false, dark, 35.0, fmtPct,
                        juce::String::fromUTF8("Contrôle de présence hautes fréquences (contre-réaction)."));
     masterKnob_.init(*this, apvts, "amp_master", "MASTER", KalyxTheme::heritageBlue, false, dark, 65.0, fmtPct,
-                     juce::String::fromUTF8("Volume maître de sortie de la tête d'ampli."));
+                     juce::String::fromUTF8("Saturation de l'étage de puissance (avec Auto-Gain inversé)."));
+    headOutKnob_.init(*this, apvts, "amp_head_out", "HEAD OUT", KalyxTheme::heritageBlue, true, dark, 0.0, fmtDb,
+                      juce::String::fromUTF8("Trim de sortie propre post-ampli (-24 à +24 dB)."));
 
     sagBar_.init(*this, apvts, "amp_sag", "POWER SAG (660V)", KalyxTheme::classicAmber, false, dark, 30.0, fmtPct,
                  juce::String::fromUTF8("Affaissement dynamique de l'alimentation haute tension (660V)."));
@@ -337,16 +339,25 @@ KalyxBassRigEditor::KalyxBassRigEditor(KalyxBassRigProcessor& proc)
     outFader_.setTooltip(juce::String::fromUTF8("Niveau de sortie Master global du plugin."));
 
     kickEnBtn_.setClickingTogglesState(true);
+    kickScListenBtn_.setClickingTogglesState(true);
     limEnBtn_.setClickingTogglesState(true);
-    kickEnBtn_.setTooltip(juce::String::fromUTF8("Active le Kick-Drum Dynamic Relief (sidechain interne)."));
+    kickEnBtn_.setTooltip(juce::String::fromUTF8("Active le Kick-Drum Dynamic Relief (sidechain externe)."));
+    kickScListenBtn_.setTooltip(juce::String::fromUTF8("Écoute le signal Sidechain filtré par le SC HPF."));
     limEnBtn_.setTooltip(juce::String::fromUTF8("Active le limiteur Master True-Peak en fin de chaîne."));
-    kickEnAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "kick_relief_en", kickEnBtn_);
-    limEnAtt_  = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "lim_en", limEnBtn_);
+    kickEnAtt_       = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "kick_relief_en", kickEnBtn_);
+    kickScListenAtt_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "kick_sc_listen", kickScListenBtn_);
+    limEnAtt_        = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, "lim_en", limEnBtn_);
     addAndMakeVisible(kickEnBtn_);
+    addAndMakeVisible(kickScListenBtn_);
     addAndMakeVisible(limEnBtn_);
 
-    kickAmtBar_.init(*this, apvts, "kick_relief_amt", "KICK DUCK", KalyxTheme::kalyxAubergine, false, dark, 45.0, fmtPct,
-                     juce::String::fromUTF8("Intensité du ducking dynamique pour laisser passer la grosse caisse."));
+    kickScInBar_.init(*this, apvts, "kick_sc_in", "EXT SC IN", KalyxTheme::hybridCyan, true, dark, 0.0, fmtDb,
+                      juce::String::fromUTF8("Trim d'entrée du signal sidechain externe (-24 à +24 dB)."));
+    kickScHpfBar_.init(*this, apvts, "kick_sc_hpf", "SC HPF", KalyxTheme::classicAmber, false, dark, 45.0,
+                       [](double v) { return juce::String(v, 0) + " Hz"; },
+                       juce::String::fromUTF8("Filtre passe-haut sur le détecteur sidechain (20 à 300 Hz)."));
+    kickAmtBar_.init(*this, apvts, "kick_relief_amt", "DUCK AMT", KalyxTheme::kalyxAubergine, false, dark, -9.0, fmtDb,
+                     juce::String::fromUTF8("Profondeur maximale de réduction sur le kick (0 à -24 dB)."));
     limCeilBar_.init(*this, apvts, "lim_ceiling", "CEILING", KalyxTheme::alertRed, false, dark, -0.3, fmtDb,
                      juce::String::fromUTF8("Plafond maximal (dBFS) du limiteur de sortie."));
 
@@ -520,6 +531,8 @@ void KalyxBassRigEditor::applyTheme()
     ampLevelFader_.setThemeColours(KalyxTheme::getAccent(theme_), dark);
     diLevelFader_.setThemeColours(KalyxTheme::getPrimary(theme_), dark);
     outFader_.setThemeColours(KalyxTheme::classicAmber, dark);
+    kickScInBar_.setThemeColours(KalyxTheme::hybridCyan, dark);
+    kickScHpfBar_.setThemeColours(KalyxTheme::classicAmber, dark);
     kickAmtBar_.setThemeColours(KalyxTheme::getPrimary(theme_), dark);
     limCeilBar_.setThemeColours(KalyxTheme::alertRed, dark);
     if (vuModePill_) vuModePill_->setThemeColours(KalyxTheme::getAccent(theme_), dark);
@@ -550,6 +563,7 @@ void KalyxBassRigEditor::updateAmpModelVisibility()
     midKnob_.setThemeColours(acc, dark);
     trebleKnob_.setThemeColours(acc, dark);
     masterKnob_.setThemeColours(acc, dark);
+    headOutKnob_.setThemeColours(acc, dark);
 
     // Model-specific controls
     ampChannelPill_->setVisible(m == 0);
@@ -673,6 +687,7 @@ void KalyxBassRigEditor::resized()
     compBoostKnob_.setUiScale(sc);
     presenceKnob_.setUiScale(sc);
     masterKnob_.setUiScale(sc);
+    headOutKnob_.setUiScale(sc);
     sagBar_.setUiScale(sc);
     biasBar_.setUiScale(sc);
     cabAPanBar_.setUiScale(sc);
@@ -687,6 +702,8 @@ void KalyxBassRigEditor::resized()
     ampLevelFader_.setUiScale(sc);
     diLevelFader_.setUiScale(sc);
     outFader_.setUiScale(sc);
+    kickScInBar_.setUiScale(sc);
+    kickScHpfBar_.setUiScale(sc);
     kickAmtBar_.setUiScale(sc);
     limCeilBar_.setUiScale(sc);
     pedalboardView_.setUiScale(sc);
@@ -819,6 +836,7 @@ void KalyxBassRigEditor::resized()
     if (compBoostKnob_.slider.isVisible()) knobs.push_back(&compBoostKnob_);
     if (presenceKnob_.slider.isVisible()) knobs.push_back(&presenceKnob_);
     knobs.push_back(&masterKnob_);
+    knobs.push_back(&headOutKnob_);
 
     const float kw = static_cast<float>(ampR.getWidth()) / static_cast<float>(knobs.size());
     for (size_t i = 0; i < knobs.size(); ++i)
@@ -873,12 +891,22 @@ void KalyxBassRigEditor::resized()
     phaseCorrBar_.setBounds(rightR.removeFromTop(static_cast<int>(20.0f * sc)));
     rightR.removeFromTop(static_cast<int>(8.0f * sc));
 
-    auto botMaster = rightR.removeFromBottom(static_cast<int>(88.0f * sc));
-    auto kickRow = botMaster.removeFromTop(static_cast<int>(24.0f * sc));
-    kickEnBtn_.setBounds(kickRow.removeFromLeft(static_cast<int>(82.0f * sc)));
-    kickRow.removeFromLeft(4);
-    kickAmtBar_.setBounds(kickRow);
+    auto botMaster = rightR.removeFromBottom(static_cast<int>(118.0f * sc));
+    auto kickBtnsRow = botMaster.removeFromTop(static_cast<int>(22.0f * sc));
+    kickEnBtn_.setBounds(kickBtnsRow.removeFromLeft(kickBtnsRow.getWidth() / 2 - static_cast<int>(2.0f * sc)));
+    kickBtnsRow.removeFromLeft(static_cast<int>(4.0f * sc));
+    kickScListenBtn_.setBounds(kickBtnsRow);
+    botMaster.removeFromTop(static_cast<int>(4.0f * sc));
+
+    auto kickTrimRow = botMaster.removeFromTop(static_cast<int>(24.0f * sc));
+    kickScInBar_.setBounds(kickTrimRow.removeFromLeft(kickTrimRow.getWidth() / 2 - static_cast<int>(2.0f * sc)));
+    kickTrimRow.removeFromLeft(static_cast<int>(4.0f * sc));
+    kickScHpfBar_.setBounds(kickTrimRow);
+    botMaster.removeFromTop(static_cast<int>(4.0f * sc));
+
+    kickAmtBar_.setBounds(botMaster.removeFromTop(static_cast<int>(24.0f * sc)));
     botMaster.removeFromTop(static_cast<int>(6.0f * sc));
+
     auto limRow = botMaster.removeFromTop(static_cast<int>(24.0f * sc));
     limEnBtn_.setBounds(limRow.removeFromLeft(static_cast<int>(82.0f * sc)));
     limRow.removeFromLeft(4);

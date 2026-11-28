@@ -29,6 +29,7 @@ struct AmpControlState
     double   sagPct      { 30.0 };  // 0..100
     double   biasPct     { 0.0 };   // -50..+50
     double   masterPct   { 65.0 };  // 0..100
+    double   headOutDb   { 0.0 };   // -24..+24 dB post-amp clean trim
     bool     eq9Enabled  { true };
     std::array<double, 9> eq9GainsDb { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 };

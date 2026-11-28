@@ -70,12 +70,16 @@ class SmartKickRelief64
 public:
     void prepare(double sampleRate) noexcept;
     void reset() noexcept;
-    void processStereo(double& l, double& r, double sidechainSample, bool enabled, double amountPct) noexcept;
+    void processStereo(double& l, double& r, double sidechainSample,
+                       bool enabled, double scInDb, double scHpfHz,
+                       double duckDepthDb, bool scListen) noexcept;
     [[nodiscard]] float getDuckDb() const noexcept { return duckDb_.load(std::memory_order_relaxed); }
 
 private:
     double sampleRate_ { 48000.0 };
     double scEnv_      { 0.0 };
+    double lastHpfHz_  { -1.0 };
+    ZDFStateVariableFilter scHpf_;
     ZDFStateVariableFilter dynBellL_, dynBellR_;
     std::atomic<float> duckDb_ { 0.0f };
 };

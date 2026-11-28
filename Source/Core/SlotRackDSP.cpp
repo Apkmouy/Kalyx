@@ -328,7 +328,7 @@ float SlotUnitDSP::processModuleById(int modId,
         case SlotModuleId::HarmonicSculptor:   harmonicSculptorDsp_.processSample(l, r, p); return 0.0f;
         case SlotModuleId::StereoPhase:        stereoPhaseDsp_.processSample(l, r, p); return 0.0f;
         case SlotModuleId::UtilityGateDeEsser: return procUtilityGateDeEsser(l, r, detL, detR, p);
-        case SlotModuleId::PrecisionLimiter:   return procPrecisionLimiter(l, r, p);
+        case SlotModuleId::PrecisionLimiter:   return procPrecisionLimiter(l, r, detL, detR, p);
         case SlotModuleId::SurgicalEQ2U:
         case SlotModuleId::PrecisionDyn2U:
         case SlotModuleId::EmptyBypass:
@@ -884,7 +884,7 @@ void SlotUnitDSP::procConsoleColor(float& l, float& r, const SlotParamArray& p, 
     l *= trimG; r *= trimG;
 }
 
-float SlotUnitDSP::procPrecisionLimiter(float& l, float& r, const SlotParamArray& p) noexcept
+float SlotUnitDSP::procPrecisionLimiter(float& l, float& r, float detL, float detR, const SlotParamArray& p) noexcept
 {
     if (p[0] <= 0.5f) { limEnvDb_ = limFastRc_ = limSlowRc_ = 0.0; return 0.0f; }
 
@@ -894,7 +894,7 @@ float SlotUnitDSP::procPrecisionLimiter(float& l, float& r, const SlotParamArray
     const float ceilDb    = mapLin(p[4], -24.0f, 0.0f);
     const float blend     = std::clamp(p[5], 0.0f, 1.0f);
 
-    const double peak = std::max({ static_cast<double>(std::abs(l)), static_cast<double>(std::abs(r)), 1.0e-7 });
+    const double peak = std::max({ static_cast<double>(std::abs(detL)), static_cast<double>(std::abs(detR)), 1.0e-7 });
     const double db   = 20.0 * std::log10(peak);
     const double over = std::max(0.0, db - static_cast<double>(thrDb));
 

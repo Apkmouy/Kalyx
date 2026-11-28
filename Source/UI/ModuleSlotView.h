@@ -76,6 +76,8 @@ private:
     juce::TextButton moduleMenuBtn_;
     juce::ToggleButton agBtn_;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> agAtt_;
+    juce::ToggleButton extScBtn_, scListenBtn_;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> extScAtt_, scListenAtt_;
     juce::Rectangle<float> leftArrowRect_, rightArrowRect_, lockIconRect_, ledMeterRect_, peakLedRect_;
 
     // Contrôles dynamiques de la façade active (recréés uniquement lors d'un changement de module sur le thread GUI)

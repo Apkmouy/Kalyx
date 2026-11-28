@@ -374,7 +374,8 @@ void KalyxHybridConsoleProcessor::processSingleSampleBlock(float* left, float* r
         float sampleTotalGr = 0.0f;
         if (inP.scListen)
         {
-            l = scL; r = scR;
+            l = (scLeft != nullptr) ? scLeft[n] : scL;
+            r = (scRight != nullptr) ? scRight[n] : scR;
         }
         else
         {
@@ -577,6 +578,11 @@ void KalyxHybridConsoleProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             scL = scBus.getReadPointer(0);
             scR = (scBus.getNumChannels() >= 2) ? scBus.getReadPointer(1) : scL;
         }
+    }
+    else if (buffer.getNumChannels() >= 4)
+    {
+        scL = buffer.getReadPointer(2);
+        scR = buffer.getReadPointer(3);
     }
 
     for (int ch = 0; ch < std::min(inCh, outCh); ++ch)

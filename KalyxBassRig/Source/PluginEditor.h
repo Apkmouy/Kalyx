@@ -83,7 +83,7 @@ private:
     juce::ComboBox ultraLoBox_, midFreqBox_, depthBox_;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> ultraLoAtt_, midFreqAtt_, depthAtt_;
 
-    kalyx::bass::ui::KalyxRotaryControl gainKnob_, bassKnob_, midKnob_, trebleKnob_, driveKnob_, compBoostKnob_, presenceKnob_, masterKnob_;
+    kalyx::bass::ui::KalyxRotaryControl gainKnob_, bassKnob_, midKnob_, trebleKnob_, driveKnob_, compBoostKnob_, presenceKnob_, masterKnob_, headOutKnob_;
     kalyx::bass::ui::TactileFaderBar sagBar_, biasBar_;
 
     // Center Bottom: Dual Cabinet IR
@@ -107,9 +107,9 @@ private:
     kalyx::bass::ui::PhaseCorrelometerBar phaseCorrBar_;
     kalyx::bass::ui::VerticalConsoleFader ampLevelFader_, diLevelFader_, outFader_;
 
-    juce::ToggleButton kickEnBtn_ { "KICK SC" }, limEnBtn_ { "LIMITER" };
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> kickEnAtt_, limEnAtt_;
-    kalyx::bass::ui::TactileFaderBar kickAmtBar_, limCeilBar_;
+    juce::ToggleButton kickEnBtn_ { "KICK SC" }, kickScListenBtn_ { "SC LISTEN" }, limEnBtn_ { "LIMITER" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> kickEnAtt_, kickScListenAtt_, limEnAtt_;
+    kalyx::bass::ui::TactileFaderBar kickScInBar_, kickScHpfBar_, kickAmtBar_, limCeilBar_;
 
     // Overlays
     kalyx::bass::ui::TunerOverlay tunerOverlay_;

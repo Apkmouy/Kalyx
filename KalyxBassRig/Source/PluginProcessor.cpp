@@ -106,6 +106,7 @@ kalyx::bass::dsp::AmpControlState KalyxBassRigProcessor::getAmpSnapshot() const 
     st.sagPct      = getF("amp_sag");
     st.biasPct     = getF("amp_bias");
     st.masterPct   = getF("amp_master");
+    st.headOutDb   = getF("amp_head_out");
     st.eq9Enabled  = getF("eq9_en") > 0.5f;
     const char* eqIds[9] = { "eq9_40", "eq9_90", "eq9_180", "eq9_300", "eq9_500", "eq9_1k", "eq9_2k", "eq9_4k", "eq9_10k" };
     for (size_t i = 0; i < 9; ++i)
@@ -187,7 +188,10 @@ void KalyxBassRigProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     const double ampLevelGain = std::pow(10.0, static_cast<double>(getF("amp_level")) / 20.0);
     const double diLevelGain  = std::pow(10.0, static_cast<double>(getF("di_level")) / 20.0);
     const bool kickEn         = getF("kick_relief_en") > 0.5f;
-    const double kickAmt      = getF("kick_relief_amt");
+    const double kickScInDb   = getF("kick_sc_in");
+    const double kickScHpf    = getF("kick_sc_hpf");
+    const double kickAmtDb    = getF("kick_relief_amt");
+    const bool kickScListen   = getF("kick_sc_listen") > 0.5f;
     const bool limEn          = getF("lim_en") > 0.5f;
     const double limCeil      = getF("lim_ceiling");
     const double outFaderGain = std::pow(10.0, static_cast<double>(getF("out_fader")) / 20.0);
@@ -195,7 +199,8 @@ void KalyxBassRigProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     const float* inL = mainBus.getReadPointer(0);
     const float* inR = (numInCh > 1) ? mainBus.getReadPointer(1) : inL;
     const float* scL = (scBus.getNumChannels() > 0 && scBus.getNumSamples() >= numSamples)
-                           ? scBus.getReadPointer(0) : nullptr;
+                           ? scBus.getReadPointer(0)
+                           : ((buffer.getNumChannels() >= 4 && buffer.getNumSamples() >= numSamples) ? buffer.getReadPointer(2) : nullptr);
 
     // 300 ms VU ballistics
     const double vuCoeff = std::exp(-1.0 / (0.300 * hostSampleRate_));
@@ -358,7 +363,7 @@ void KalyxBassRigProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
         double sumR = postBufR_[static_cast<size_t>(i)];
 
         const double scS = (scL != nullptr) ? static_cast<double>(scL[i]) : 0.0;
-        kickRelief_.processStereo(sumL, sumR, scS, kickEn, kickAmt);
+        kickRelief_.processStereo(sumL, sumR, scS, kickEn, kickScInDb, kickScHpf, kickAmtDb, kickScListen);
         limiter_.processStereo(sumL, sumR, limEn, limCeil);
 
         sumL *= outFaderGain;
